@@ -74,35 +74,24 @@ fn test_configure_mode_timeout() {
 #[test]
 fn test_configure_cs_pin_error() {
     let clock = TestClock::new(vec![]);
-    let bus = MockSPIBus::new();
-    let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(1).return_const(Err(20));
+    let mut mocks = Mocks::default();
+    mocks.mock_cs_error();
 
-    let mut controller = Controller::new(bus, pin_cs);
     assert_eq!(
-        ConfigError::BusError(BusError::CSError(20)),
-        controller.configure(&clock).unwrap_err()
+        ConfigError::BusError(BusError::CSError(21)),
+        mocks.into_controller().configure(&clock).unwrap_err()
     );
 }
 
 #[test]
 fn test_configure_transfer_error() {
     let clock = TestClock::new(vec![]);
+    let mut mocks = Mocks::default();
+    mocks.mock_transfer_error();
 
-    let mut bus = MockSPIBus::new();
-    bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0x20, 0x3, 0xC], data);
-        Err(50)
-    });
-
-    let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(1).return_const(Ok(()));
-    pin_cs.expect_set_high().times(1).return_const(Ok(()));
-
-    let mut controller = Controller::new(bus, pin_cs);
     assert_eq!(
-        ConfigError::BusError(BusError::TransferError(50)),
-        controller.configure(&clock).unwrap_err()
+        ConfigError::BusError(BusError::TransferError(55)),
+        mocks.into_controller().configure(&clock).unwrap_err()
     );
 }
 
@@ -132,29 +121,46 @@ fn test_read_operation_status_correct() {
 
 #[test]
 fn test_read_operation_status_cs_error() {
-    let bus = MockSPIBus::new();
-    let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(1).return_const(Err(21));
+    let mut mocks = Mocks::default();
+    mocks.mock_cs_error();
 
-    let mut controller: Controller<_, _, TestClock> = Controller::new(bus, pin_cs);
-    assert_eq!(BusError::CSError(21), controller.read_operation_status().unwrap_err());
+    assert_eq!(
+        BusError::CSError(21),
+        mocks.into_controller().read_operation_status().unwrap_err()
+    );
 }
 
 #[test]
 fn test_read_operation_status_transfer_error() {
-    let mut bus = MockSPIBus::new();
-    bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0x30, 0x2, 0x0], data);
-        Err(55)
-    });
+    let mut mocks = Mocks::default();
+    mocks.mock_transfer_error();
 
-    let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(1).return_const(Ok(()));
-    pin_cs.expect_set_high().times(1).return_const(Ok(()));
-
-    let mut controller: Controller<_, _, TestClock> = Controller::new(bus, pin_cs);
     assert_eq!(
         BusError::TransferError(55),
-        controller.read_operation_status().unwrap_err()
+        mocks.into_controller().read_operation_status().unwrap_err()
     );
+}
+
+#[derive(Default)]
+struct Mocks {
+    bus: MockSPIBus,
+    pin_cs: MockPin,
+}
+
+impl Mocks {
+    pub fn into_controller(self) -> Controller<MockSPIBus, MockPin, TestClock> {
+        Controller::new(self.bus, self.pin_cs)
+    }
+
+    /// Simulates a SPI transfer fault
+    pub fn mock_transfer_error(&mut self) {
+        self.bus.expect_transfer().times(1).return_const(Err(55));
+        self.pin_cs.expect_set_low().times(1).return_const(Ok(()));
+        self.pin_cs.expect_set_high().times(1).return_const(Ok(()));
+    }
+
+    /// Simulates a CS pin set error
+    pub fn mock_cs_error(&mut self) {
+        self.pin_cs.expect_set_low().times(1).return_const(Err(21));
+    }
 }
