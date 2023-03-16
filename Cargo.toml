@@ -13,6 +13,8 @@ documentation = "https://docs.rs/mcp2517"
 
 [dependencies]
 embedded-hal = { version = "0.2.7", features = ["unproven"] }
+embedded-time = "0.12.1"
+log = "0.4.17"
 
 [dev-dependencies]
 mockall = "0.11.0"

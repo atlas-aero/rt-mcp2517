@@ -1,6 +1,11 @@
 #![cfg_attr(not(test), no_std)]
 
-pub mod can;
+extern crate alloc;
 
+pub mod can;
+pub mod status;
+
+#[cfg(test)]
+pub(crate) mod mocks;
 #[cfg(test)]
 mod tests;
