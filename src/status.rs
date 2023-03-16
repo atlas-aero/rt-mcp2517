@@ -24,6 +24,7 @@ pub struct OperationStatus {
 }
 
 impl OperationStatus {
+    /// Maps register bits
     pub(crate) fn from_register(register: u8) -> Self {
         Self {
             mode: OperationMode::from_register(register),
@@ -57,6 +58,7 @@ pub enum OperationMode {
 }
 
 impl OperationMode {
+    /// Maps register bits
     pub(crate) fn from_register(register: u8) -> Self {
         match register >> 5 {
             0b000 => Self::NormalCANFD,
@@ -67,6 +69,32 @@ impl OperationMode {
             0b101 => Self::ExternalLoopback,
             0b110 => Self::NormalCAN2_0,
             _ => Self::RestrictedOperation,
+        }
+    }
+}
+
+/// Mapped OSC register
+#[derive(Copy, Clone, Debug)]
+pub struct OscillatorStatus {
+    /// Synchronized SCLKDIV bit
+    pub sclk_ready: bool,
+
+    /// Status of clock
+    /// True => Clock is running and stable
+    /// False => Clock is not ready or off
+    pub clock_ready: bool,
+
+    /// True if PLL is locked, False if PLL is not ready
+    pub pll_ready: bool,
+}
+
+impl OscillatorStatus {
+    /// Maps register bits to status
+    pub fn from_register(register: u8) -> Self {
+        Self {
+            sclk_ready: register & (1 << 4) != 0,
+            clock_ready: register & (1 << 2) != 0,
+            pll_ready: register & 1 != 0,
         }
     }
 }

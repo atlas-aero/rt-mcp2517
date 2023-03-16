@@ -1,6 +1,6 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ModeTimeout};
-use crate::status::{OperationMode, OperationStatus};
+use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
@@ -9,6 +9,7 @@ use embedded_time::Clock;
 use log::debug;
 
 const REGISTER_C1CON: u16 = 0x000;
+const REGISTER_OSC: u16 = 0xE00;
 
 /// General SPI Errors
 #[derive(Debug, PartialEq)]
@@ -63,6 +64,12 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn read_operation_status(&mut self) -> Result<OperationStatus, BusError<B::Error, CS::Error>> {
         let data = self.read_register(REGISTER_C1CON + 2)?;
         Ok(OperationStatus::from_register(data))
+    }
+
+    /// Reads and returns the oscillator status
+    pub fn read_oscillator_status(&mut self) -> Result<OscillatorStatus, BusError<B::Error, CS::Error>> {
+        let data = self.read_register(REGISTER_OSC + 1)?;
+        Ok(OscillatorStatus::from_register(data))
     }
 
     /// Enters configuration mode

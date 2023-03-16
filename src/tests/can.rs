@@ -97,19 +97,10 @@ fn test_configure_transfer_error() {
 
 #[test]
 fn test_read_operation_status_correct() {
-    let mut bus = MockSPIBus::new();
+    let mut mocks = Mocks::default();
+    mocks.mock_register_read::<0b0001_0100>([0x30, 0x2]);
 
-    bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0x30, 0x2, 0x0], data);
-        Ok(&[0x0, 0x0, 0b0001_0100])
-    });
-
-    let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(1).return_const(Ok(()));
-    pin_cs.expect_set_high().times(1).return_const(Ok(()));
-
-    let mut controller: Controller<_, _, TestClock> = Controller::new(bus, pin_cs);
-    let status = controller.read_operation_status().unwrap();
+    let status = mocks.into_controller().read_operation_status().unwrap();
 
     assert_eq!(OperationMode::NormalCANFD, status.mode);
     assert!(status.txq_reserved);
@@ -141,6 +132,40 @@ fn test_read_operation_status_transfer_error() {
     );
 }
 
+#[test]
+fn test_read_oscillator_status_correct() {
+    let mut mocks = Mocks::default();
+    mocks.mock_register_read::<0b0001_0100>([0x3E, 0x1]);
+
+    let status = mocks.into_controller().read_oscillator_status().unwrap();
+
+    assert!(status.sclk_ready);
+    assert!(status.clock_ready);
+    assert!(!status.pll_ready);
+}
+
+#[test]
+fn test_read_oscillator_status_cs_error() {
+    let mut mocks = Mocks::default();
+    mocks.mock_cs_error();
+
+    assert_eq!(
+        BusError::CSError(21),
+        mocks.into_controller().read_oscillator_status().unwrap_err()
+    );
+}
+
+#[test]
+fn test_read_oscillator_transfer_error() {
+    let mut mocks = Mocks::default();
+    mocks.mock_transfer_error();
+
+    assert_eq!(
+        BusError::TransferError(55),
+        mocks.into_controller().read_oscillator_status().unwrap_err()
+    );
+}
+
 #[derive(Default)]
 struct Mocks {
     bus: MockSPIBus,
@@ -162,5 +187,18 @@ impl Mocks {
     /// Simulates a CS pin set error
     pub fn mock_cs_error(&mut self) {
         self.pin_cs.expect_set_low().times(1).return_const(Err(21));
+    }
+
+    /// Mocks the reading of a single register byte
+    pub fn mock_register_read<const REG: u8>(&mut self, expected_command: [u8; 2]) {
+        let expected_buffer = [expected_command[0], expected_command[1], 0x0];
+
+        self.bus.expect_transfer().times(1).returning(move |data| {
+            assert_eq!(expected_buffer, data);
+            Ok(&[0x0, 0x0, REG])
+        });
+
+        self.pin_cs.expect_set_low().times(1).return_const(Ok(()));
+        self.pin_cs.expect_set_high().times(1).return_const(Ok(()));
     }
 }
