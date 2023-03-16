@@ -1,5 +1,6 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ModeTimeout};
+use crate::config::ClockConfiguration;
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
@@ -70,6 +71,12 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn read_oscillator_status(&mut self) -> Result<OscillatorStatus, BusError<B::Error, CS::Error>> {
         let data = self.read_register(REGISTER_OSC + 1)?;
         Ok(OscillatorStatus::from_register(data))
+    }
+
+    /// Reads and returns the current clock configuration
+    pub fn read_clock_configuration(&mut self) -> Result<ClockConfiguration, BusError<B::Error, CS::Error>> {
+        let data = self.read_register(REGISTER_OSC)?;
+        Ok(ClockConfiguration::from_register(data))
     }
 
     /// Enters configuration mode

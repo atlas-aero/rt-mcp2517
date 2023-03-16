@@ -1,0 +1,86 @@
+/// Oscillator/Clock configuration
+#[derive(Copy, Clone, Debug)]
+pub struct ClockConfiguration {
+    /// Divisor for clock output
+    pub clock_output: ClockOutputDivisor,
+
+    /// Divisor for system clock
+    pub system_clock: SystemClockDivisor,
+
+    /// Disable clock/oscillator?
+    pub disable_clock: bool,
+
+    /// PLL configuration
+    pub pll: PLLSetting,
+}
+
+impl ClockConfiguration {
+    /// Maps register values to configuration
+    pub(crate) fn from_register(register: u8) -> Self {
+        Self {
+            clock_output: ClockOutputDivisor::from_register(register),
+            system_clock: SystemClockDivisor::from_register(register),
+            disable_clock: register & (1 << 2) != 0,
+            pll: PLLSetting::from_register(register),
+        }
+    }
+}
+
+/// Divisor for clock output
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ClockOutputDivisor {
+    DivideBy10 = 0b11,
+    DivideBy4 = 0b10,
+    DivideBy2 = 0b01,
+    DivideBy1 = 0b00,
+}
+
+impl ClockOutputDivisor {
+    /// Maps register values to configuration
+    pub(crate) fn from_register(register: u8) -> Self {
+        match register >> 5 {
+            0b11 => Self::DivideBy10,
+            0b10 => Self::DivideBy4,
+            0b01 => Self::DivideBy2,
+            _ => Self::DivideBy1,
+        }
+    }
+}
+
+/// Divisor for system clock
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum SystemClockDivisor {
+    DivideBy2 = 0b1,
+    DivideBy1 = 0b0,
+}
+
+impl SystemClockDivisor {
+    /// Maps register values to configuration
+    pub(crate) fn from_register(register: u8) -> Self {
+        if register & (1 << 4) != 0 {
+            Self::DivideBy2
+        } else {
+            Self::DivideBy1
+        }
+    }
+}
+
+/// PLL configuration
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PLLSetting {
+    /// System clock from 10x PLL
+    TenTimesPLL,
+    /// System clock comes directly from XTAL oscillator
+    DirectXTALOscillator,
+}
+
+impl PLLSetting {
+    /// Maps register values to configuration
+    pub(crate) fn from_register(register: u8) -> Self {
+        if register & 1 != 0 {
+            Self::TenTimesPLL
+        } else {
+            Self::DirectXTALOscillator
+        }
+    }
+}

@@ -1,4 +1,5 @@
 use crate::can::{BusError, ConfigError, Controller};
+use crate::config::{ClockOutputDivisor, PLLSetting, SystemClockDivisor};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
@@ -163,6 +164,41 @@ fn test_read_oscillator_transfer_error() {
     assert_eq!(
         BusError::TransferError(55),
         mocks.into_controller().read_oscillator_status().unwrap_err()
+    );
+}
+
+#[test]
+fn test_read_clock_configuration_correct() {
+    let mut mocks = Mocks::default();
+    mocks.mock_register_read::<0b0110_0000>([0x3E, 0x0]);
+
+    let status = mocks.into_controller().read_clock_configuration().unwrap();
+
+    assert_eq!(ClockOutputDivisor::DivideBy10, status.clock_output);
+    assert_eq!(SystemClockDivisor::DivideBy1, status.system_clock);
+    assert!(!status.disable_clock);
+    assert_eq!(PLLSetting::DirectXTALOscillator, status.pll);
+}
+
+#[test]
+fn test_read_clock_configuration_cs_error() {
+    let mut mocks = Mocks::default();
+    mocks.mock_cs_error();
+
+    assert_eq!(
+        BusError::CSError(21),
+        mocks.into_controller().read_clock_configuration().unwrap_err()
+    );
+}
+
+#[test]
+fn test_read_clock_configuration_transfer_error() {
+    let mut mocks = Mocks::default();
+    mocks.mock_transfer_error();
+
+    assert_eq!(
+        BusError::TransferError(55),
+        mocks.into_controller().read_clock_configuration().unwrap_err()
     );
 }
 
