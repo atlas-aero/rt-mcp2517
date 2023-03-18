@@ -1,5 +1,11 @@
+/// Entire configuration currently supported
+#[derive(Default, Clone, Debug)]
+pub struct Configuration {
+    pub clock: ClockConfiguration,
+}
+
 /// Oscillator/Clock configuration
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct ClockConfiguration {
     /// Divisor for clock output
     pub clock_output: ClockOutputDivisor,
@@ -24,6 +30,18 @@ impl ClockConfiguration {
             pll: PLLSetting::from_register(register),
         }
     }
+
+    /// Encodes the configuration to register byte
+    pub(crate) fn as_register(&self) -> u8 {
+        let mut register = 0x0;
+
+        register |= (self.clock_output as u8) << 5;
+        register |= (self.system_clock as u8) << 4;
+        register |= (self.disable_clock as u8) << 2;
+        register |= self.pll as u8;
+
+        register
+    }
 }
 
 /// Divisor for clock output
@@ -33,6 +51,12 @@ pub enum ClockOutputDivisor {
     DivideBy4 = 0b10,
     DivideBy2 = 0b01,
     DivideBy1 = 0b00,
+}
+
+impl Default for ClockOutputDivisor {
+    fn default() -> Self {
+        Self::DivideBy1
+    }
 }
 
 impl ClockOutputDivisor {
@@ -54,6 +78,12 @@ pub enum SystemClockDivisor {
     DivideBy1 = 0b0,
 }
 
+impl Default for SystemClockDivisor {
+    fn default() -> Self {
+        Self::DivideBy1
+    }
+}
+
 impl SystemClockDivisor {
     /// Maps register values to configuration
     pub(crate) fn from_register(register: u8) -> Self {
@@ -69,9 +99,15 @@ impl SystemClockDivisor {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PLLSetting {
     /// System clock from 10x PLL
-    TenTimesPLL,
+    TenTimesPLL = 0b1,
     /// System clock comes directly from XTAL oscillator
-    DirectXTALOscillator,
+    DirectXTALOscillator = 0b0,
+}
+
+impl Default for PLLSetting {
+    fn default() -> Self {
+        Self::DirectXTALOscillator
+    }
 }
 
 impl PLLSetting {

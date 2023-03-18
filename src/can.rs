@@ -1,6 +1,6 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ModeTimeout};
-use crate::config::ClockConfiguration;
+use crate::config::{ClockConfiguration, Configuration};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
@@ -57,8 +57,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
 
     /// Configures the controller with the given settings
-    pub fn configure(&mut self, clock: &CLK) -> Result<(), ConfigError<B::Error, CS::Error>> {
-        self.enable_configuration_mode(clock)
+    pub fn configure(&mut self, config: &Configuration, clock: &CLK) -> Result<(), ConfigError<B::Error, CS::Error>> {
+        self.enable_configuration_mode(clock)?;
+        self.write_register(REGISTER_OSC, config.clock.as_register())?;
+
+        Ok(())
     }
 
     /// Reads and returns the operation status

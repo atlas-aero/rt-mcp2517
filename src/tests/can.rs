@@ -1,5 +1,5 @@
 use crate::can::{BusError, ConfigError, Controller};
-use crate::config::{ClockOutputDivisor, PLLSetting, SystemClockDivisor};
+use crate::config::{ClockConfiguration, ClockOutputDivisor, Configuration, PLLSetting, SystemClockDivisor};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
@@ -30,12 +30,30 @@ fn test_configure_correct() {
         Ok(&[0x0, 0x0, 0b1001_0100])
     });
 
+    // Writing clock configuration
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x2E, 0x0, 0b0110_0001], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(3).return_const(Ok(()));
-    pin_cs.expect_set_high().times(3).return_const(Ok(()));
+    pin_cs.expect_set_low().times(4).return_const(Ok(()));
+    pin_cs.expect_set_high().times(4).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
-    controller.configure(&clock).unwrap();
+    controller
+        .configure(
+            &Configuration {
+                clock: ClockConfiguration {
+                    clock_output: ClockOutputDivisor::DivideBy10,
+                    system_clock: SystemClockDivisor::DivideBy1,
+                    disable_clock: false,
+                    pll: PLLSetting::TenTimesPLL,
+                },
+            },
+            &clock,
+        )
+        .unwrap();
 }
 
 #[test]
@@ -69,7 +87,10 @@ fn test_configure_mode_timeout() {
     pin_cs.expect_set_high().times(3).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
-    assert_eq!(ConfigError::ModeTimeout, controller.configure(&clock).unwrap_err());
+    assert_eq!(
+        ConfigError::ModeTimeout,
+        controller.configure(&Configuration::default(), &clock).unwrap_err()
+    );
 }
 
 #[test]
@@ -80,7 +101,10 @@ fn test_configure_cs_pin_error() {
 
     assert_eq!(
         ConfigError::BusError(BusError::CSError(21)),
-        mocks.into_controller().configure(&clock).unwrap_err()
+        mocks
+            .into_controller()
+            .configure(&Configuration::default(), &clock)
+            .unwrap_err()
     );
 }
 
@@ -92,7 +116,10 @@ fn test_configure_transfer_error() {
 
     assert_eq!(
         ConfigError::BusError(BusError::TransferError(55)),
-        mocks.into_controller().configure(&clock).unwrap_err()
+        mocks
+            .into_controller()
+            .configure(&Configuration::default(), &clock)
+            .unwrap_err()
     );
 }
 
