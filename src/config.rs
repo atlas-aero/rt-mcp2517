@@ -131,17 +131,74 @@ pub struct FifoConfiguration {
     /// Receive FIFO size in message: 0 - 32.
     /// Value is limited to 32 messages if a higher value is given.
     pub rx_size: u8,
+
+    /// Number of retransmission attempts
+    pub tx_attempts: RetransmissionAttempts,
+
+    /// Transmission priority of FIFO queue (0 = Lowest, 32 = Highest)
+    /// Value is limited to 32 if a higher value is given
+    pub tx_priority: u8,
+
+    /// Transmission FIFO size in message: 0 - 32.
+    /// Value is limited to 32 messages if a higher value is given.
+    pub tx_size: u8,
+
+    /// Enables/Disables TX FIFO
+    pub tx_enable: bool,
 }
 
 impl Default for FifoConfiguration {
     fn default() -> Self {
-        Self { rx_size: 32 }
+        Self {
+            rx_size: 32,
+            tx_attempts: RetransmissionAttempts::default(),
+            tx_priority: 0,
+            tx_size: 32,
+            tx_enable: true,
+        }
     }
 }
 
 impl FifoConfiguration {
     /// Encodes the configuration to RX FIFO configuration register byte
     pub(crate) fn as_rx_register(&self) -> u8 {
-        self.rx_size.max(1).min(32) - 1
+        Self::limit_size(self.rx_size) - 1
+    }
+
+    /// Encodes the configuration for the first TX configuration register byte
+    pub(crate) fn as_tx_register_0(&self) -> u8 {
+        match self.tx_enable {
+            true => 0b1000_0000,
+            false => 0b0000_0000,
+        }
+    }
+
+    /// Encodes the configuration for the third TX configuration register byte
+    pub(crate) fn as_tx_register_2(&self) -> u8 {
+        ((self.tx_attempts as u8) << 5) | self.tx_priority.min(31)
+    }
+
+    /// Encodes the configuration for the fourth TX configuration register byte
+    pub(crate) fn as_tx_register_3(&self) -> u8 {
+        Self::limit_size(self.tx_size) - 1
+    }
+
+    /// Limits the size to valid values
+    fn limit_size(size: u8) -> u8 {
+        size.max(1).min(32)
+    }
+}
+
+/// Number of retransmission attempts
+#[derive(Copy, Clone, Debug)]
+pub enum RetransmissionAttempts {
+    Disabled = 0b00,
+    Three = 0b01,
+    Unlimited = 0b10,
+}
+
+impl Default for RetransmissionAttempts {
+    fn default() -> Self {
+        Self::Unlimited
     }
 }

@@ -1,6 +1,7 @@
 use crate::can::{BusError, ConfigError, Controller};
 use crate::config::{
-    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, SystemClockDivisor,
+    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RetransmissionAttempts,
+    SystemClockDivisor,
 };
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
@@ -44,9 +45,27 @@ fn test_configure_correct() {
         Ok(&[0x0, 0x0, 0x0])
     });
 
+    // Writing TX FIFO configuration
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x6A, 0b0010_1010], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
+    // Writing TX FIFO configuration
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x6B, 0b0001_0011], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
+    // Writing TX FIFO configuration
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x68, 0b1000_0000], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(5).return_const(Ok(()));
-    pin_cs.expect_set_high().times(5).return_const(Ok(()));
+    pin_cs.expect_set_low().times(8).return_const(Ok(()));
+    pin_cs.expect_set_high().times(8).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     controller
@@ -58,7 +77,13 @@ fn test_configure_correct() {
                     disable_clock: false,
                     pll: PLLSetting::TenTimesPLL,
                 },
-                fifo: FifoConfiguration { rx_size: 16 },
+                fifo: FifoConfiguration {
+                    rx_size: 16,
+                    tx_attempts: RetransmissionAttempts::Three,
+                    tx_priority: 10,
+                    tx_size: 20,
+                    tx_enable: true,
+                },
             },
             &clock,
         )
