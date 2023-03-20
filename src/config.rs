@@ -1,7 +1,11 @@
 /// Entire configuration currently supported
 #[derive(Default, Clone, Debug)]
 pub struct Configuration {
+    /// Oscillator/Clock configuration
     pub clock: ClockConfiguration,
+
+    /// TX/RX FIFO configuration
+    pub fifo: FifoConfiguration,
 }
 
 /// Oscillator/Clock configuration
@@ -118,5 +122,26 @@ impl PLLSetting {
         } else {
             Self::DirectXTALOscillator
         }
+    }
+}
+
+/// Transmit and receive FIFO configuration
+#[derive(Copy, Clone, Debug)]
+pub struct FifoConfiguration {
+    /// Receive FIFO size in message: 0 - 32.
+    /// Value is limited to 32 messages if a higher value is given.
+    pub rx_size: u8,
+}
+
+impl Default for FifoConfiguration {
+    fn default() -> Self {
+        Self { rx_size: 32 }
+    }
+}
+
+impl FifoConfiguration {
+    /// Encodes the configuration to RX FIFO configuration register byte
+    pub(crate) fn as_rx_register(&self) -> u8 {
+        self.rx_size.max(1).min(32) - 1
     }
 }

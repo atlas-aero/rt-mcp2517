@@ -1,4 +1,4 @@
-use crate::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
+use crate::config::{ClockConfiguration, ClockOutputDivisor, FifoConfiguration, PLLSetting, SystemClockDivisor};
 
 #[test]
 fn test_clock_from_register() {
@@ -88,4 +88,16 @@ fn test_clock_configuration_to_register() {
         }
         .as_register()
     );
+}
+
+#[test]
+fn test_fife_configuration_as_rx_register() {
+    assert_eq!(0b0000_0000, FifoConfiguration { rx_size: 0 }.as_rx_register());
+    assert_eq!(0b0000_0000, FifoConfiguration { rx_size: 1 }.as_rx_register());
+
+    assert_eq!(0b0000_0001, FifoConfiguration { rx_size: 2 }.as_rx_register());
+    assert_eq!(0b0000_1011, FifoConfiguration { rx_size: 12 }.as_rx_register());
+
+    assert_eq!(0b0001_1111, FifoConfiguration { rx_size: 32 }.as_rx_register());
+    assert_eq!(0b0001_1111, FifoConfiguration { rx_size: 33 }.as_rx_register());
 }

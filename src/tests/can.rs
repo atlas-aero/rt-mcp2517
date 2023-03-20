@@ -1,5 +1,7 @@
 use crate::can::{BusError, ConfigError, Controller};
-use crate::config::{ClockConfiguration, ClockOutputDivisor, Configuration, PLLSetting, SystemClockDivisor};
+use crate::config::{
+    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, SystemClockDivisor,
+};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
@@ -36,9 +38,15 @@ fn test_configure_correct() {
         Ok(&[0x0, 0x0, 0x0])
     });
 
+    // Writing RX FIFO configuration
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x5F, 0b0000_1111], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(4).return_const(Ok(()));
-    pin_cs.expect_set_high().times(4).return_const(Ok(()));
+    pin_cs.expect_set_low().times(5).return_const(Ok(()));
+    pin_cs.expect_set_high().times(5).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     controller
@@ -50,6 +58,7 @@ fn test_configure_correct() {
                     disable_clock: false,
                     pll: PLLSetting::TenTimesPLL,
                 },
+                fifo: FifoConfiguration { rx_size: 16 },
             },
             &clock,
         )

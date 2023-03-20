@@ -12,6 +12,9 @@ use log::debug;
 const REGISTER_C1CON: u16 = 0x000;
 const REGISTER_OSC: u16 = 0xE00;
 
+/// FIFO index for receiving CAN messages
+const FIFO_RX_INDEX: u8 = 1;
+
 /// General SPI Errors
 #[derive(Debug, PartialEq)]
 pub enum BusError<B, CS> {
@@ -60,6 +63,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn configure(&mut self, config: &Configuration, clock: &CLK) -> Result<(), ConfigError<B::Error, CS::Error>> {
         self.enable_configuration_mode(clock)?;
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
+        self.write_register(Self::fifo_register(FIFO_RX_INDEX) + 3, config.fifo.as_rx_register())?;
 
         Ok(())
     }
@@ -134,6 +138,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         buffer[1] = (command & 0xFF) as u8;
 
         buffer
+    }
+
+    /// Returns the configuration register index for the given FIFO index
+    fn fifo_register(fifo_index: u8) -> u16 {
+        0x05C + 12 * (fifo_index as u16 - 1)
     }
 }
 
