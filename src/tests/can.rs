@@ -1,7 +1,7 @@
 use crate::can::{BusError, ConfigError, Controller};
 use crate::config::{
-    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RetransmissionAttempts,
-    SystemClockDivisor,
+    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RequestMode,
+    RetransmissionAttempts, SystemClockDivisor,
 };
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
@@ -10,14 +10,17 @@ use alloc::vec;
 #[test]
 fn test_configure_correct() {
     let clock = TestClock::new(vec![
-        100, // Timer start,
-        200, // First expiration check
-        300, // Second expiration check
+        100,    // Config mode: Timer start,
+        200,    // Config mode: First expiration check
+        300,    // Config mode: Second expiration check
+        10_000, // Request mode: Timer start
+        10_100, // Request mode: First expiration check
     ]);
 
     let mut bus = MockSPIBus::new();
+    // Request configuration mode
     bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0x20, 0x3, 0xC], data);
+        assert_eq!([0x20, 0x3, 0b0000_1100], data);
         Ok(&[0x0, 0x0, 0x0])
     });
 
@@ -63,9 +66,21 @@ fn test_configure_correct() {
         Ok(&[0x0, 0x0, 0x0])
     });
 
+    // Request normal CAN 2.0B mode
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x3, 0b0000_1110], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
+    // Request mode reached
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x30, 0x2, 0x0], data);
+        Ok(&[0x0, 0x0, 0b1100_0000])
+    });
+
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(8).return_const(Ok(()));
-    pin_cs.expect_set_high().times(8).return_const(Ok(()));
+    pin_cs.expect_set_low().times(10).return_const(Ok(()));
+    pin_cs.expect_set_high().times(10).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     controller
@@ -84,6 +99,7 @@ fn test_configure_correct() {
                     tx_size: 20,
                     tx_enable: true,
                 },
+                mode: RequestMode::NormalCAN2_0,
             },
             &clock,
         )
@@ -122,7 +138,54 @@ fn test_configure_mode_timeout() {
 
     let mut controller = Controller::new(bus, pin_cs);
     assert_eq!(
-        ConfigError::ModeTimeout,
+        ConfigError::ConfigurationModeTimeout,
+        controller.configure(&Configuration::default(), &clock).unwrap_err()
+    );
+}
+
+#[test]
+fn test_request_mode_timeout() {
+    let clock = TestClock::new(vec![
+        100,    // Config mode: Timer start,
+        200,    // Config mode: First expiration check
+        300,    // Config mode: Second expiration check
+        10_000, // Request mode: Timer start
+        10_100, // Request mode: First expiration check
+        15_000, // Request mode: Second expiration check (expired)
+    ]);
+
+    let mut bus = MockSPIBus::new();
+    // Request configuration mode
+    bus.expect_transfer().times(1).returning(move |_| Ok(&[0x0, 0x0, 0x0]));
+
+    // Still in normal mode
+    bus.expect_transfer().times(1).returning(move |_| Ok(&[0x0, 0x0, 0b0001_0100]));
+
+    // Configuration mode
+    bus.expect_transfer().times(1).returning(move |_| Ok(&[0x0, 0x0, 0b1001_0100]));
+
+    // Writing configuration registers
+    bus.expect_transfer().times(5).returning(move |_| Ok(&[0x0, 0x0, 0x0]));
+
+    // Request normal CAN FD mode
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x3, 0b0000_1000], data);
+        Ok(&[0x0, 0x0, 0x0])
+    });
+
+    // Still configuration mode
+    bus.expect_transfer().times(2).returning(move |data| {
+        assert_eq!([0x30, 0x2, 0x0], data);
+        Ok(&[0x0, 0x0, 0b1001_0100])
+    });
+
+    let mut pin_cs = MockPin::new();
+    pin_cs.expect_set_low().times(11).return_const(Ok(()));
+    pin_cs.expect_set_high().times(11).return_const(Ok(()));
+
+    let mut controller = Controller::new(bus, pin_cs);
+    assert_eq!(
+        ConfigError::RequestModeTimeout,
         controller.configure(&Configuration::default(), &clock).unwrap_err()
     );
 }

@@ -1,5 +1,5 @@
 use crate::can::BusError::{CSError, TransferError};
-use crate::can::ConfigError::{ClockError, ModeTimeout};
+use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
@@ -38,7 +38,10 @@ pub enum ConfigError<B, CS> {
     ClockError,
 
     /// No configuration mode within timeout of 2 ms
-    ModeTimeout,
+    ConfigurationModeTimeout,
+
+    /// Device did not enter given request mode within timeout of 2 ms
+    RequestModeTimeout,
 }
 
 /// Main MCP2517 CAN controller device
@@ -64,7 +67,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
     /// Configures the controller with the given settings
     pub fn configure(&mut self, config: &Configuration, clock: &CLK) -> Result<(), ConfigError<B::Error, CS::Error>> {
-        self.enable_configuration_mode(clock)?;
+        self.enable_mode(OperationMode::Configuration, clock, ConfigurationModeTimeout)?;
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
 
         self.write_register(Self::fifo_register(FIFO_RX_INDEX) + 3, config.fifo.as_rx_register())?;
@@ -72,6 +75,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.write_register(Self::fifo_register(FIFO_TX_INDEX) + 3, config.fifo.as_tx_register_3())?;
         self.write_register(Self::fifo_register(FIFO_TX_INDEX), config.fifo.as_tx_register_0())?;
 
+        self.enable_mode(config.mode.to_operation_mode(), clock, RequestModeTimeout)?;
         Ok(())
     }
 
@@ -93,19 +97,25 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(ClockConfiguration::from_register(data))
     }
 
-    /// Enters configuration mode
-    fn enable_configuration_mode(&mut self, clock: &CLK) -> Result<(), ConfigError<B::Error, CS::Error>> {
-        self.write_register(REGISTER_C1CON + 3, 0x04 | (1 << 3))?;
+    /// Enters the given mode, aborts all running transactions
+    /// and waits max. 2 ms for the given mode to be reached
+    fn enable_mode(
+        &mut self,
+        mode: OperationMode,
+        clock: &CLK,
+        timeout_error: ConfigError<B::Error, CS::Error>,
+    ) -> Result<(), ConfigError<B::Error, CS::Error>> {
+        self.write_register(REGISTER_C1CON + 3, mode as u8 | (1 << 3))?;
 
         let target = clock.try_now()?.checked_add(Milliseconds::new(2)).ok_or(ClockError)?;
-        let mut mode = OperationMode::NormalCAN2_0;
+        let mut current_mode = None;
 
-        while mode != OperationMode::Configuration {
-            mode = self.read_operation_status()?.mode;
+        while current_mode.is_none() || current_mode.unwrap() != mode {
+            current_mode = Some(self.read_operation_status()?.mode);
 
             if clock.try_now()? > target {
                 debug!("Device did not enter config mode within timeout. Current mode: {mode:?}");
-                return Err(ModeTimeout);
+                return Err(timeout_error);
             }
         }
 

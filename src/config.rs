@@ -1,3 +1,5 @@
+use crate::status::OperationMode;
+
 /// Entire configuration currently supported
 #[derive(Default, Clone, Debug)]
 pub struct Configuration {
@@ -6,6 +8,9 @@ pub struct Configuration {
 
     /// TX/RX FIFO configuration
     pub fifo: FifoConfiguration,
+
+    /// Target request/operation mode
+    pub mode: RequestMode,
 }
 
 /// Oscillator/Clock configuration
@@ -200,5 +205,35 @@ pub enum RetransmissionAttempts {
 impl Default for RetransmissionAttempts {
     fn default() -> Self {
         Self::Unlimited
+    }
+}
+
+/// Request mode. This is basically a subset of operation mode, filtered to request modes
+#[derive(Copy, Clone, Debug)]
+pub enum RequestMode {
+    /// Normal CAN FD mode, supports mixing of CAN FDC can classic CAN 2.0 frames
+    NormalCANFD,
+    /// Internal loop back mode
+    InternalLoopback,
+    /// External loop back mode
+    ExternalLoopback,
+    /// CAN 2.0 mode, possible error frames on CAN FD frames
+    NormalCAN2_0,
+}
+
+impl Default for RequestMode {
+    fn default() -> Self {
+        Self::NormalCANFD
+    }
+}
+
+impl RequestMode {
+    pub(crate) fn to_operation_mode(self) -> OperationMode {
+        match self {
+            RequestMode::NormalCANFD => OperationMode::NormalCANFD,
+            RequestMode::InternalLoopback => OperationMode::InternalLoopback,
+            RequestMode::ExternalLoopback => OperationMode::ExternalLoopback,
+            RequestMode::NormalCAN2_0 => OperationMode::NormalCAN2_0,
+        }
     }
 }
