@@ -6,6 +6,7 @@ use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_time::duration::Milliseconds;
+use embedded_can::blocking::Can;
 use embedded_time::Clock;
 use log::debug;
 
@@ -122,7 +123,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(())
     }
 
-    /// Writes the a single register byte
+    /// Writes a single register byte
     fn write_register(&mut self, register: u16, value: u8) -> Result<(), BusError<B::Error, CS::Error>> {
         let mut buffer = self.cmd_buffer(register, Operation::Write);
         buffer[2] = value;
@@ -181,3 +182,4 @@ impl<B, CS> From<BusError<B, CS>> for ConfigError<B, CS> {
         Self::BusError(value)
     }
 }
+

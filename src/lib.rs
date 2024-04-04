@@ -10,3 +10,4 @@ pub mod status;
 pub(crate) mod mocks;
 #[cfg(test)]
 mod tests;
+mod frame;
