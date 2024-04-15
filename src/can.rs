@@ -1,24 +1,30 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
+use crate::message::TxMessage;
+use crate::registers::{FifoControlReg1, FifoStatusReg0};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_time::duration::Milliseconds;
-use embedded_can::blocking::Can;
 use embedded_time::Clock;
 use log::debug;
 
 const REGISTER_C1CON: u16 = 0x000;
 const REGISTER_OSC: u16 = 0xE00;
+const C1FLTCON0: u16 = 0x1D0;
 
 /// FIFO index for receiving CAN messages
 const FIFO_RX_INDEX: u8 = 1;
 
 /// FIFO index for transmitting CAN messages
 const FIFO_TX_INDEX: u8 = 2;
-
+#[derive(Debug, PartialEq)]
+pub enum TestError<B, CS> {
+    TestCSErr(CS),
+    TestBErr(B),
+}
 /// General SPI Errors
 #[derive(Debug, PartialEq)]
 pub enum BusError<B, CS> {
@@ -43,6 +49,25 @@ pub enum ConfigError<B, CS> {
 
     /// Device did not enter given request mode within timeout of 2 ms
     RequestModeTimeout,
+}
+#[derive(Debug)]
+pub enum Error<B, CS> {
+    ConfigErr(ConfigError<B, CS>),
+    BusErr(BusError<B, CS>),
+    InvalidPayloadLength,
+    InvalidRamAddress(u16),
+}
+
+impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
+    fn from(value: BusError<B, CS>) -> Self {
+        Error::BusErr(value)
+    }
+}
+
+impl<B, CS> From<ConfigError<B, CS>> for Error<B, CS> {
+    fn from(value: ConfigError<B, CS>) -> Self {
+        Error::ConfigErr(value)
+    }
 }
 
 /// Main MCP2517 CAN controller device
@@ -71,10 +96,22 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.enable_mode(OperationMode::Configuration, clock, ConfigurationModeTimeout)?;
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
 
-        self.write_register(Self::fifo_register(FIFO_RX_INDEX) + 3, config.fifo.as_rx_register())?;
-        self.write_register(Self::fifo_register(FIFO_TX_INDEX) + 2, config.fifo.as_tx_register_2())?;
-        self.write_register(Self::fifo_register(FIFO_TX_INDEX) + 3, config.fifo.as_tx_register_3())?;
-        self.write_register(Self::fifo_register(FIFO_TX_INDEX), config.fifo.as_tx_register_0())?;
+        self.write_register(
+            Self::fifo_control_register(FIFO_RX_INDEX) + 3,
+            config.fifo.as_rx_register(),
+        )?;
+        self.write_register(
+            Self::fifo_control_register(FIFO_TX_INDEX) + 2,
+            config.fifo.as_tx_register_2(),
+        )?;
+        self.write_register(
+            Self::fifo_control_register(FIFO_TX_INDEX) + 3,
+            config.fifo.as_tx_register_3(),
+        )?;
+        self.write_register(
+            Self::fifo_control_register(FIFO_TX_INDEX),
+            config.fifo.as_tx_register_0(),
+        )?;
 
         self.enable_mode(config.mode.to_operation_mode(), clock, RequestModeTimeout)?;
         Ok(())
@@ -132,6 +169,97 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(())
     }
 
+    pub fn reset(&mut self) -> Result<(), BusError<B::Error, CS::Error>> {
+        let mut buffer = self.cmd_buffer(0u16, Operation::Reset);
+        self.transfer(&mut buffer[..2])?;
+        Ok(())
+    }
+
+    pub fn transmit(&mut self, message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
+        // make sure there is space for new message in TX FIFO
+        // read byte 0 of TX FIFO status register
+        let txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
+
+        let txfifo_status_reg0 = FifoStatusReg0::from_bytes([txfifo_status_byte0]);
+
+        // block until there is room available for new message in TX FIFO
+        while !txfifo_status_reg0.tfnrfnif() {}
+
+        // get address in which to write next message in TX FIFO (should not be read in configuration mode)
+        let address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
+
+        // load message in TX FIFO
+        self.write_fifo(address as u16, message)?;
+        // set uinc and txreq bits in TX FIFO control register
+        self.write_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1, 0x03)?;
+
+        let txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
+        let txfifo_control_reg = FifoControlReg1::from_bytes([txfifo_control_byte1]);
+
+        // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
+        while txfifo_control_reg.txreq() {}
+        Ok(())
+    }
+
+    /// Insert message object in TX FIFO
+    fn write_fifo(&mut self, register: u16, message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
+        self.verify_ram_address(register, message.payload.len())?;
+
+        let mut buffer = [0u8; 2];
+        let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
+
+        buffer[0] = (command >> 8) as u8;
+        buffer[1] = (command & 0xFF) as u8;
+
+        self.pin_cs.set_low().map_err(CSError)?;
+        self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        self.bus.transfer(message.payload).map_err(TransferError)?;
+        self.pin_cs.set_high().map_err(CSError)?;
+        Ok(())
+    }
+
+    /// Read message from RX FIFO
+    fn read_fifo(&mut self, register: u16, data: &mut [u8]) -> Result<(), Error<B::Error, CS::Error>> {
+        let mut buffer = [0u8; 2];
+        let command = (register & 0x0FFF) | ((Operation::Read as u16) << 12);
+
+        buffer[0] = (command >> 8) as u8;
+        buffer[1] = (command & 0xFF) as u8;
+
+        self.pin_cs.set_low().map_err(CSError)?;
+        self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        self.bus.transfer(data).map_err(TransferError)?;
+        self.pin_cs.set_high().map_err(CSError)?;
+        Ok(())
+    }
+
+    /// 4-byte register read
+    fn read32(&mut self, register: u16) -> Result<u32, BusError<B::Error, CS::Error>> {
+        // create 6 byte cmd buffer (2 bytes cmd+addr , 4 bytes for register value)
+        let mut buffer = [0u8; 6];
+        let command = (register & 0x0FFF) | ((Operation::Read as u16) << 12);
+
+        buffer[0] = (command >> 8) as u8;
+        buffer[1] = (command & 0xFF) as u8;
+
+        self.pin_cs.set_low().map_err(CSError)?;
+        self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        self.pin_cs.set_high().map_err(CSError)?;
+
+        let mut data_read = [0u8; 4];
+        data_read.clone_from_slice(&buffer[2..]);
+        // reverse so that msb byte of register is at the first index
+        let result = u32::from_le_bytes(data_read);
+        Ok(result)
+    }
+    /// Verify address within RAM bounds
+    fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), Error<B::Error, CS::Error>> {
+        if addr < 0x400 || (addr + (data_length as u16)) > 0xBFF {
+            return Err(Error::InvalidRamAddress(addr));
+        }
+        Ok(())
+    }
+
     /// Reads a single register byte
     fn read_register(&mut self, register: u16) -> Result<u8, BusError<B::Error, CS::Error>> {
         let mut buffer = self.cmd_buffer(register, Operation::Read);
@@ -158,15 +286,25 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         buffer
     }
 
-    /// Returns the configuration register index for the given FIFO index
-    fn fifo_register(fifo_index: u8) -> u16 {
+    /// Returns the configuration register address for the given FIFO index
+    fn fifo_control_register(fifo_index: u8) -> u16 {
         0x05C + 12 * (fifo_index as u16 - 1)
+    }
+
+    /// Returns the status register address for the given FIFO index
+    fn fifo_status_register(fifo_index: u8) -> u16 {
+        0x60 + 12 * (fifo_index as u16 - 1)
+    }
+    /// Returns the address of fifo user address register for the given index
+    fn fifo_user_address_register(fifo_index: u8) -> u16 {
+        0x64 + 12 * (fifo_index as u16 - 1)
     }
 }
 
 /// Register operation type
 #[derive(Copy, Clone)]
 enum Operation {
+    Reset = 0b0000,
     Write = 0b0010,
     Read = 0b0011,
 }
@@ -182,4 +320,3 @@ impl<B, CS> From<BusError<B, CS>> for ConfigError<B, CS> {
         Self::BusError(value)
     }
 }
-

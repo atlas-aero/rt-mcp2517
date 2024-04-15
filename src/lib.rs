@@ -6,8 +6,9 @@ pub mod can;
 pub mod config;
 pub mod status;
 
+mod message;
 #[cfg(test)]
 pub(crate) mod mocks;
+mod registers;
 #[cfg(test)]
 mod tests;
-mod frame;

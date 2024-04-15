@@ -1,6 +1,6 @@
 use crate::can::{BusError, ConfigError, Controller};
 use crate::config::{
-    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RequestMode,
+    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
     RetransmissionAttempts, SystemClockDivisor,
 };
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
@@ -96,6 +96,7 @@ fn test_configure_correct() {
                     rx_size: 16,
                     tx_attempts: RetransmissionAttempts::Three,
                     tx_priority: 10,
+                    pl_size: PayloadSize::EightBytes,
                     tx_size: 20,
                     tx_enable: true,
                 },
