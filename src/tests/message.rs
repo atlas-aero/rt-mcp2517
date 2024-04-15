@@ -41,8 +41,3 @@ fn test_dlc_error() {
     assert_eq!(message_2_0.unwrap_err(), DLCError::InvalidLength(10));
     assert_eq!(message_fd.unwrap_err(), DLCError::InvalidLength(65));
 }
-
-//#[test]
-//fn test_txmessage_config{
-//
-//}
