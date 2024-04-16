@@ -7,7 +7,7 @@ pub const EXTENDED_IDENTIFIER_MASK: u32 = 0x3FFFF;
 pub const MAX_PAYLOAD_CAN_2_0: usize = 8;
 pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
-#[derive(BitfieldSpecifier, Debug, Eq, PartialEq)]
+#[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[bits = 4]
 pub enum DLC {
     Zero,
@@ -27,7 +27,7 @@ pub enum DLC {
     FortyEight,
     SixtyFour,
 }
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DLCError {
     InvalidLength(usize),
 }
@@ -58,7 +58,7 @@ impl DLC {
 
 /// Transmit message object header
 #[bitfield(bits = 64)]
-#[derive(BitfieldSpecifier, Debug, Eq, PartialEq)]
+#[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxHeader {
     // T0
     #[skip]
@@ -81,14 +81,15 @@ pub struct TxHeader {
 impl TxHeader {}
 
 /// Transmit Message Object
-#[derive(Debug, Eq, PartialEq)]
-pub struct TxMessage<'a> {
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct TxMessage {
     pub(crate) header: TxHeader,
-    pub(crate) payload: &'a mut [u8],
+    pub(crate) payload: [u8; MAX_PAYLOAD_CAN_FD],
+    pub(crate) length: usize,
 }
 
-impl<'a> TxMessage<'a> {
-    pub fn new(identifier: Id, data: &'a mut [u8], can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
+impl TxMessage {
+    pub fn new(identifier: Id, data: &[u8], can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
         let mut header = TxHeader::new();
         let mut payload_length = data.len();
 
@@ -105,6 +106,11 @@ impl<'a> TxMessage<'a> {
             debug!("Maximum of 8 data bytes allowed for CAN2.0 message. Current size: {payload_length}");
             return Err(DLCError::InvalidLength(data.len()));
         }
+        // make sure length divisible by four (word size)
+        let length = (payload_length + 3) & !3;
+
+        let mut buffer = [0u8; MAX_PAYLOAD_CAN_FD];
+        buffer[..payload_length].copy_from_slice(data);
 
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;
@@ -120,9 +126,10 @@ impl<'a> TxMessage<'a> {
                 header.set_identifier_extension_flag(true);
             }
         }
-        Ok(TxMessage { header, payload: data })
-    }
-    pub fn header_as_bytes(self) -> [u8; 8] {
-        self.header.into_bytes()
+        Ok(TxMessage {
+            header,
+            payload: buffer,
+            length,
+        })
     }
 }

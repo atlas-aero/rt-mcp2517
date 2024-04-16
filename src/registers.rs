@@ -4,7 +4,18 @@ use modular_bitfield_msb::prelude::*;
 #[bitfield]
 pub struct FifoControlReg3 {
     pub plsize: B3,
-    pub fsize: B5,
+    fsize: B5,
+}
+impl FifoControlReg3 {
+    /// set number of messages in FIFO
+    pub fn with_fifo_size(mut self, value: u8) -> Self {
+        let size = value.max(1).min(32);
+        self.set_fsize(size - 1);
+        self
+    }
+    pub fn get_fifo_size(&self) -> u8 {
+        self.fsize() + 1
+    }
 }
 
 /// Third byte of FIFO Control register

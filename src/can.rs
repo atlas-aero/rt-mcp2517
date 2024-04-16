@@ -1,7 +1,7 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
-use crate::config::{ClockConfiguration, Configuration};
-use crate::message::TxMessage;
+use crate::config::{ClockConfiguration, Configuration, PayloadSize};
+use crate::message::{TxMessage, DLC};
 use crate::registers::{FifoControlReg1, FifoStatusReg0};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
@@ -54,7 +54,7 @@ pub enum ConfigError<B, CS> {
 pub enum Error<B, CS> {
     ConfigErr(ConfigError<B, CS>),
     BusErr(BusError<B, CS>),
-    InvalidPayloadLength,
+    InvalidPayloadLength(usize),
     InvalidRamAddress(u16),
 }
 
@@ -179,11 +179,16 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         // make sure there is space for new message in TX FIFO
         // read byte 0 of TX FIFO status register
         let txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
-
         let txfifo_status_reg0 = FifoStatusReg0::from_bytes([txfifo_status_byte0]);
-
         // block until there is room available for new message in TX FIFO
         while !txfifo_status_reg0.tfnrfnif() {}
+
+        // make sure length of payload is consistent with CAN operation mode
+        let operation_status = self.read_operation_status()?;
+
+        if message.length > 8 && operation_status.mode != OperationMode::NormalCANFD {
+            return Err(Error::InvalidPayloadLength(message.length));
+        }
 
         // get address in which to write next message in TX FIFO (should not be read in configuration mode)
         let address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
@@ -202,8 +207,8 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
 
     /// Insert message object in TX FIFO
-    fn write_fifo(&mut self, register: u16, message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
-        self.verify_ram_address(register, message.payload.len())?;
+    fn write_fifo(&mut self, register: u16, mut message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
+        self.verify_ram_address(register, message.length)?;
 
         let mut buffer = [0u8; 2];
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
@@ -213,7 +218,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(message.payload).map_err(TransferError)?;
+        self.bus.transfer(&mut message.header.into_bytes()).map_err(TransferError)?;
+        self.bus
+            .transfer(&mut message.payload[..message.length])
+            .map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
         Ok(())
     }
@@ -254,7 +262,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
     /// Verify address within RAM bounds
     fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), Error<B::Error, CS::Error>> {
-        if addr < 0x400 || (addr + (data_length as u16)) > 0xBFF {
+        if addr > 0x400 || (addr + (data_length as u16)) < 0xBFF {
             return Err(Error::InvalidRamAddress(addr));
         }
         Ok(())
