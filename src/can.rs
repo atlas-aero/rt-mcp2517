@@ -195,9 +195,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // load message in TX FIFO
         self.write_fifo(address as u16, message)?;
-        // set uinc and txreq bits in TX FIFO control register
+        // Request transmission (set txreq) and set uinc in TX FIFO control register byte 1
         self.write_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1, 0x03)?;
 
+        // read TX FIFO control register byte 1
         let txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
         let txfifo_control_reg = FifoControlReg1::from_bytes([txfifo_control_byte1]);
 
