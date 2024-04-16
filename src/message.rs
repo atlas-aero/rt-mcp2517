@@ -7,6 +7,7 @@ pub const EXTENDED_IDENTIFIER_MASK: u32 = 0x3FFFF;
 pub const MAX_PAYLOAD_CAN_2_0: usize = 8;
 pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
+/// Data length code
 #[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[bits = 4]
 pub enum DLC {

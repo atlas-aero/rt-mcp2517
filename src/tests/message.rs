@@ -16,9 +16,9 @@ fn test_extended_id() {
 }
 #[test]
 fn test_standard_id() {
-    let mut data = [0u8; 8];
+    let data = [0u8; 8];
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
-    let message = TxMessage::new(Id::Standard(standard_id), &mut data, false, false).unwrap();
+    let message = TxMessage::new(Id::Standard(standard_id), &data, false, false).unwrap();
     assert!(!message.header.identifier_extension_flag());
     assert_eq!(message.header.extended_identifier(), 0b00_0000_0000_0000_0000);
     assert_eq!(message.header.standard_identifier(), 0b110_1010_0101);
@@ -31,6 +31,8 @@ fn test_dlc_success() {
     assert_eq!(message.header.data_length_code(), DLC::Sixteen);
     assert!(message.header.fd_frame());
     assert_eq!(message.length, 16);
+    let header_bytes = message.header.into_bytes();
+    assert_eq!(header_bytes[7], 0b1000_1010);
 }
 
 #[test]
