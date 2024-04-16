@@ -226,21 +226,6 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(())
     }
 
-    /// Read message from RX FIFO
-    fn read_fifo(&mut self, register: u16, data: &mut [u8]) -> Result<(), Error<B::Error, CS::Error>> {
-        let mut buffer = [0u8; 2];
-        let command = (register & 0x0FFF) | ((Operation::Read as u16) << 12);
-
-        buffer[0] = (command >> 8) as u8;
-        buffer[1] = (command & 0xFF) as u8;
-
-        self.pin_cs.set_low().map_err(CSError)?;
-        self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(data).map_err(TransferError)?;
-        self.pin_cs.set_high().map_err(CSError)?;
-        Ok(())
-    }
-
     /// 4-byte register read
     fn read32(&mut self, register: u16) -> Result<u32, BusError<B::Error, CS::Error>> {
         // create 6 byte cmd buffer (2 bytes cmd+addr , 4 bytes for register value)
