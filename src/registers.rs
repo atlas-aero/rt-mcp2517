@@ -7,12 +7,13 @@ pub struct FifoControlReg3 {
     fsize: B5,
 }
 impl FifoControlReg3 {
-    /// set number of messages in FIFO
+    /// set FIFO size (number of messages 1-32)
     pub fn with_fifo_size(mut self, value: u8) -> Self {
         let size = value.max(1).min(32);
         self.set_fsize(size - 1);
         self
     }
+    /// get FIFO size
     pub fn get_fifo_size(&self) -> u8 {
         self.fsize() + 1
     }

@@ -1,7 +1,7 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
-use crate::config::{ClockConfiguration, Configuration, PayloadSize};
-use crate::message::{TxMessage, DLC};
+use crate::config::{ClockConfiguration, Configuration};
+use crate::message::TxMessage;
 use crate::registers::{FifoControlReg1, FifoStatusReg0};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
@@ -13,7 +13,6 @@ use log::debug;
 
 const REGISTER_C1CON: u16 = 0x000;
 const REGISTER_OSC: u16 = 0xE00;
-const C1FLTCON0: u16 = 0x1D0;
 
 /// FIFO index for receiving CAN messages
 const FIFO_RX_INDEX: u8 = 1;
