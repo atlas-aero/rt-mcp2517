@@ -14,13 +14,19 @@ impl FifoControlReg3 {
         self
     }
     /// get FIFO size
-    pub fn get_fifo_size(&self) -> u8 {
+    pub fn fifo_size(&self) -> u8 {
         self.fsize() + 1
+    }
+}
+impl Default for FifoControlReg3 {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 /// Third byte of FIFO Control register
 #[bitfield]
+#[repr(u8)]
 pub struct FifoControlReg2 {
     #[skip]
     __: B1,
@@ -30,6 +36,7 @@ pub struct FifoControlReg2 {
 
 /// Second byte of FIFO Control register
 #[bitfield]
+#[repr(u8)]
 pub struct FifoControlReg1 {
     #[skip]
     __: B5,
@@ -40,6 +47,7 @@ pub struct FifoControlReg1 {
 
 /// First byte of FIFO Control register
 #[bitfield]
+#[repr(u8)]
 pub struct FifoControlReg0 {
     pub txen: bool,
     pub rtren: bool,
@@ -53,6 +61,7 @@ pub struct FifoControlReg0 {
 
 /// Second byte of FIFO Status register
 #[bitfield]
+#[repr(u8)]
 pub struct FifoStatusReg1 {
     #[skip]
     __: B3,
@@ -60,6 +69,7 @@ pub struct FifoStatusReg1 {
 }
 /// First byte of FIFO Status register
 #[bitfield]
+#[repr(u8)]
 pub struct FifoStatusReg0 {
     pub txabt: bool,
     pub txlarb: bool,
@@ -69,4 +79,33 @@ pub struct FifoStatusReg0 {
     pub tferffif: bool,
     pub tfhrfhif: bool,
     pub tfnrfnif: bool,
+}
+/// filter mask
+#[bitfield]
+#[repr(u32)]
+pub struct FilterMaskReg {
+    #[skip]
+    __: B1,
+    pub mide: bool,
+    pub msid11: bool,
+    pub meid: B18,
+    pub msid: B11,
+}
+
+impl Default for FilterMaskReg {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// filter object
+#[bitfield]
+#[repr(u32)]
+pub struct FilterObjectReg {
+    #[skip]
+    __: B1,
+    pub exide: bool,
+    pub sid11: bool,
+    pub eid: B18,
+    pub sid: B11,
 }

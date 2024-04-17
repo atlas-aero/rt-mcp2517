@@ -1,8 +1,8 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
-use crate::message::TxMessage;
-use crate::registers::{FifoControlReg1, FifoStatusReg0};
+use crate::message::{RxHeader, TxMessage};
+use crate::registers::{FifoControlReg1, FifoStatusReg0, FilterMaskReg, FilterObjectReg};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
@@ -112,6 +112,8 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
             config.fifo.as_tx_register_0(),
         )?;
 
+        self.enable_filter(FIFO_RX_INDEX, 0)?;
+
         self.enable_mode(config.mode.to_operation_mode(), clock, RequestModeTimeout)?;
         Ok(())
     }
@@ -158,13 +160,67 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         Ok(())
     }
+    /// Enable filter for corresponding RX FIFO
+    pub fn enable_filter(&mut self, fifo_index: u8, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+        let filter_reg = Self::filter_control_register_byte(filter_index);
+        // Filter must be disabled to modify FmBP
+        self.disable_filter(filter_index)?;
+        self.write_register(filter_reg, fifo_index)?;
+        // Set FLTENm to enable filter
+        self.write_register(filter_reg, (1 << 7) & fifo_index)?;
+        Ok(())
+    }
 
+    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+        let filter_reg = Self::filter_control_register_byte(filter_index);
+        self.write_register(filter_reg, !(1 << 7))?;
+        Ok(())
+    }
+    /// Set corresponding filter object
+    pub fn set_filter_object(
+        &mut self,
+        filter_index: u8,
+        filter: FilterObjectReg,
+    ) -> Result<(), BusError<B::Error, CS::Error>> {
+        let filter_object_reg = Self::filter_object_register(filter_index);
+        self.disable_filter(filter_index)?;
+        let filter_value = u32::from(filter);
+        self.write32(filter_object_reg, filter_value)?;
+        Ok(())
+    }
+    /// Set corresponding filter mask
+    pub fn set_filter_mask(
+        &mut self,
+        filter_index: u8,
+        filter_mask: FilterMaskReg,
+    ) -> Result<(), BusError<B::Error, CS::Error>> {
+        let filter_mask_reg = Self::filter_mask_register(filter_index);
+        let mask_value = u32::from(filter_mask);
+        self.write32(filter_mask_reg, mask_value)?;
+        Ok(())
+    }
     /// Writes a single register byte
     fn write_register(&mut self, register: u16, value: u8) -> Result<(), BusError<B::Error, CS::Error>> {
         let mut buffer = self.cmd_buffer(register, Operation::Write);
         buffer[2] = value;
 
         self.transfer(&mut buffer)?;
+        Ok(())
+    }
+
+    fn write32(&mut self, register: u16, value: u32) -> Result<(), BusError<B::Error, CS::Error>> {
+        let mut buffer = [0u8; 2];
+        let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
+
+        buffer[0] = (command >> 8) as u8;
+        buffer[1] = (command & 0xFF) as u8;
+        let mut value_bytes = value.to_le_bytes();
+
+        self.pin_cs.set_low().map_err(CSError)?;
+        self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        self.bus.transfer(&mut value_bytes).map_err(TransferError)?;
+        self.pin_cs.set_high().map_err(CSError)?;
+
         Ok(())
     }
 
@@ -178,7 +234,8 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         // make sure there is space for new message in TX FIFO
         // read byte 0 of TX FIFO status register
         let txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
-        let txfifo_status_reg0 = FifoStatusReg0::from_bytes([txfifo_status_byte0]);
+        let txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+
         // block until there is room available for new message in TX FIFO
         while !txfifo_status_reg0.tfnrfnif() {}
 
@@ -199,11 +256,32 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // read TX FIFO control register byte 1
         let txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
-        let txfifo_control_reg = FifoControlReg1::from_bytes([txfifo_control_byte1]);
+        let txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
 
         // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
         while txfifo_control_reg.txreq() {}
         Ok(())
+    }
+
+    pub fn receive(&mut self, data: &mut [u8]) -> Result<RxHeader, Error<B::Error, CS::Error>> {
+        let rxfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_RX_INDEX))?;
+        let rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
+
+        // block until fifo contains at least one message
+        while !rxfifo_status_reg0.tfnrfnif() {}
+
+        let address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
+        // read message object
+        self.read_fifo(address as u16, data)?;
+
+        // set uinc
+        self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
+
+        let mut header_bytes = [0u8; 8];
+        header_bytes.copy_from_slice(&data[..8]);
+        let message_header = RxHeader::from_bytes(header_bytes);
+
+        Ok(message_header)
     }
 
     /// Insert message object in TX FIFO
@@ -222,6 +300,20 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.bus
             .transfer(&mut message.payload[..message.length])
             .map_err(TransferError)?;
+        self.pin_cs.set_high().map_err(CSError)?;
+        Ok(())
+    }
+    /// Read message from RX FIFO
+    fn read_fifo(&mut self, register: u16, data: &mut [u8]) -> Result<(), Error<B::Error, CS::Error>> {
+        let mut buffer = [0u8; 2];
+        let command = (register & 0x0FFF) | ((Operation::Read as u16) << 12);
+
+        buffer[0] = (command >> 8) as u8;
+        buffer[1] = (command & 0xFF) as u8;
+
+        self.pin_cs.set_low().map_err(CSError)?;
+        self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        self.bus.transfer(data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
         Ok(())
     }
@@ -291,6 +383,18 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     /// Returns the address of fifo user address register for the given index
     fn fifo_user_address_register(fifo_index: u8) -> u16 {
         0x64 + 12 * (fifo_index as u16 - 1)
+    }
+    /// returns the filter control register address byte of the corresponding filter
+    fn filter_control_register_byte(filter_index: u8) -> u16 {
+        0x1D0 + filter_index as u16
+    }
+    /// returns the filter object register address of corresponding filter
+    fn filter_object_register(filter_index: u8) -> u16 {
+        0x1F0 + 8 * (filter_index as u16)
+    }
+    /// returns the filter mask register address of corresponding filter
+    fn filter_mask_register(filter_index: u8) -> u16 {
+        0x1F4 + 8 * (filter_index as u16)
     }
 }
 

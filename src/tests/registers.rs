@@ -28,7 +28,7 @@ fn test_fifocontrolreg3() {
         .with_plsize(PayloadSize::TwentyFourBytes as u8)
         .with_fifo_size(32);
 
-    assert_eq!(32, fifo_control_reg3.get_fifo_size());
+    assert_eq!(32, fifo_control_reg3.fifo_size());
     assert_eq!([0b1001_1111], fifo_control_reg3.into_bytes());
 }
 
