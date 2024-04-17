@@ -152,6 +152,33 @@ impl TxMessage {
         })
     }
 }
+/// Receive message object header
+#[bitfield(bits = 64)]
+pub struct RxHeader {
+    // R0
+    #[skip]
+    __: B2,
+    sid11: bool,
+    eid: B18,
+    sid: B11,
+    // R1
+    #[skip]
+    __: B16,
+    filhit: B5,
+    #[skip]
+    __: B2,
+    esi: bool,
+    fdf: bool,
+    brs: bool,
+    rtr: bool,
+    ide: bool,
+    dlc: DLC,
+}
+impl Default for RxHeader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Receive message object header
 #[bitfield(bits = 64)]
