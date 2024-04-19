@@ -12,6 +12,7 @@ readme = "README.md"
 documentation = "https://docs.rs/mcp2517"
 
 [dependencies]
+bytes = "1.6.0"
 embedded-can = "0.4.1"
 embedded-hal = { version = "0.2.7", features = ["unproven"] }
 embedded-time = "0.12.1"
