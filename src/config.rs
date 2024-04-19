@@ -205,7 +205,7 @@ impl FifoConfiguration {
 
     /// Limits the size to valid values
     fn limit_size(size: u8) -> u8 {
-        size.max(1).min(32)
+        size.clamp(1, 32)
     }
 }
 
