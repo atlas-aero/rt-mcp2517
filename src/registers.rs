@@ -1,5 +1,4 @@
 use modular_bitfield_msb::prelude::*;
-
 /// Fourth byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]
@@ -72,6 +71,7 @@ pub struct FifoStatusReg1 {
 }
 
 /// First byte of FIFO Status register
+
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]

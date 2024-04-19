@@ -12,6 +12,6 @@ pub mod filter;
 pub mod message;
 #[cfg(test)]
 pub(crate) mod mocks;
-mod registers;
+pub mod registers;
 #[cfg(test)]
 mod tests;
