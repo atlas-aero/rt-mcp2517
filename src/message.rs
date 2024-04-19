@@ -8,7 +8,7 @@ pub const MAX_PAYLOAD_CAN_2_0: usize = 8;
 pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
 /// Data length code
-#[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
 #[bits = 4]
 pub enum DLC {
     Zero,
@@ -59,7 +59,7 @@ impl DLC {
 
 /// Transmit message object header
 #[bitfield(bits = 64)]
-#[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(BitfieldSpecifier, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxHeader {
     // T0
     #[skip]
@@ -82,7 +82,7 @@ pub struct TxHeader {
 impl TxHeader {}
 
 /// Transmit Message Object
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxMessage {
     pub(crate) header: TxHeader,
     pub(crate) payload: [u8; MAX_PAYLOAD_CAN_FD],

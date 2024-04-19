@@ -1,5 +1,4 @@
 use modular_bitfield_msb::prelude::*;
-
 /// Fourth byte of FIFO Control register
 #[bitfield]
 pub struct FifoControlReg3 {
@@ -30,6 +29,7 @@ pub struct FifoControlReg2 {
 
 /// Second byte of FIFO Control register
 #[bitfield]
+#[repr(u8)]
 pub struct FifoControlReg1 {
     #[skip]
     __: B5,
@@ -53,13 +53,17 @@ pub struct FifoControlReg0 {
 
 /// Second byte of FIFO Status register
 #[bitfield]
+#[allow(dead_code)]
 pub struct FifoStatusReg1 {
     #[skip]
     __: B3,
     pub fifoci: B5,
 }
 /// First byte of FIFO Status register
+
+#[allow(dead_code)]
 #[bitfield]
+#[repr(u8)]
 pub struct FifoStatusReg0 {
     pub txabt: bool,
     pub txlarb: bool,
