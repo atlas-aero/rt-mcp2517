@@ -1,3 +1,4 @@
+use bytes::BytesMut;
 use embedded_can::Id;
 use log::debug;
 use modular_bitfield_msb::prelude::*;
@@ -59,7 +60,7 @@ impl DLC {
 
 /// Transmit message object header
 #[bitfield(bits = 64)]
-#[derive(BitfieldSpecifier, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(BitfieldSpecifier, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct TxHeader {
     // T0
     #[skip]
@@ -82,10 +83,10 @@ pub struct TxHeader {
 impl TxHeader {}
 
 /// Transmit Message Object
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxMessage {
     pub(crate) header: TxHeader,
-    pub(crate) payload: [u8; MAX_PAYLOAD_CAN_FD],
+    pub(crate) buff: BytesMut,
     pub(crate) length: usize,
 }
 
@@ -110,8 +111,8 @@ impl TxMessage {
         // make sure length divisible by four (word size)
         let length = (payload_length + 3) & !3;
 
-        let mut buffer = [0u8; MAX_PAYLOAD_CAN_FD];
-        buffer[..payload_length].copy_from_slice(data);
+        let mut bytes = BytesMut::with_capacity(payload_length);
+        bytes.extend_from_slice(data);
 
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;
@@ -129,7 +130,7 @@ impl TxMessage {
         }
         Ok(TxMessage {
             header,
-            payload: buffer,
+            buff: bytes,
             length,
         })
     }

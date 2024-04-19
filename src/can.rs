@@ -229,9 +229,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus
-            .transfer(&mut message.payload[..message.length])
-            .map_err(TransferError)?;
+        //      self.bus
+        //          .transfer(&mut message.payload[..message.length])
+        //          .map_err(TransferError)?;
+        self.bus.transfer(&mut message.buff).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
         Ok(())
     }
