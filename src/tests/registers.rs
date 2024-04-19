@@ -4,6 +4,7 @@ use crate::registers::*;
 fn test_fifocontrolreg0() {
     assert_eq!([0b1000_0000], FifoControlReg0::new().with_txen(true).into_bytes());
 }
+
 #[test]
 fn test_fifocontrolreg1() {
     assert_eq!(
@@ -22,6 +23,7 @@ fn test_fifocontrolreg2() {
             .into_bytes()
     );
 }
+
 #[test]
 fn test_fifocontrolreg3() {
     let fifo_control_reg3 = FifoControlReg3::new()
