@@ -197,9 +197,22 @@ fn test_transmit() {
     mocks.mock_register_read::<0x00>([0x30, 0x69]);
 
     let result = mocks.into_controller().transmit(tx_message_copy);
-    assert_eq!(result, Ok(()));
+    assert!(result.is_ok());
 }
 
+#[test]
+fn test_reset_command() {
+    let mut mocks = Mocks::default();
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x00, 0x00, 0x00], data);
+        Ok(&[0u8; 3])
+    });
+    mocks.pin_cs.expect_set_high().times(1).return_const(Ok(()));
+    mocks.pin_cs.expect_set_low().times(1).return_const(Ok(()));
+
+    let result = mocks.into_controller().reset();
+    assert!(result.is_ok());
+}
 #[test]
 fn test_request_mode_timeout() {
     let clock = TestClock::new(vec![

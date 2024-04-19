@@ -172,7 +172,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     /// Reset internal register to default and switch to Configuration mode
     pub fn reset(&mut self) -> Result<(), BusError<B::Error, CS::Error>> {
         let mut buffer = self.cmd_buffer(0u16, Operation::Reset);
-        self.transfer(&mut buffer[..2])?;
+        self.transfer(&mut buffer)?;
         Ok(())
     }
 
