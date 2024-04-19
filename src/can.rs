@@ -49,7 +49,7 @@ pub enum ConfigError<B, CS> {
     /// Device did not enter given request mode within timeout of 2 ms
     RequestModeTimeout,
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error<B, CS> {
     ConfigErr(ConfigError<B, CS>),
     BusErr(BusError<B, CS>),
@@ -233,11 +233,15 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn transmit(&mut self, message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
         // make sure there is space for new message in TX FIFO
         // read byte 0 of TX FIFO status register
-        let txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
-        let txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+
+        let mut txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
+        let mut txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
 
         // block until there is room available for new message in TX FIFO
-        while !txfifo_status_reg0.tfnrfnif() {}
+        while !txfifo_status_reg0.tfnrfnif() {
+            txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
+            txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+        }
 
         // make sure length of payload is consistent with CAN operation mode
         let operation_status = self.read_operation_status()?;
@@ -255,11 +259,15 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.write_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1, 0x03)?;
 
         // read TX FIFO control register byte 1
-        let txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
-        let txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
+
+        let mut txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
+        let mut txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
 
         // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
-        while txfifo_control_reg.txreq() {}
+        while txfifo_control_reg.txreq() {
+            txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
+            txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
+        }
         Ok(())
     }
 
@@ -288,15 +296,15 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     fn write_fifo(&mut self, register: u16, mut message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
         self.verify_ram_address(register, message.length)?;
 
-        let mut buffer = [0u8; 2];
+        let mut buffer = [0u8; 10];
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
+        buffer[2..].copy_from_slice(&message.header.into_bytes());
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(&mut message.header.into_bytes()).map_err(TransferError)?;
         self.bus
             .transfer(&mut message.payload[..message.length])
             .map_err(TransferError)?;
@@ -328,18 +336,19 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         buffer[1] = (command & 0xFF) as u8;
 
         self.pin_cs.set_low().map_err(CSError)?;
-        self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        let result = self.bus.transfer(&mut buffer).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
         let mut data_read = [0u8; 4];
-        data_read.clone_from_slice(&buffer[2..]);
+        data_read.clone_from_slice(&result[2..]);
+
         // reverse so that msb byte of register is at the first index
         let result = u32::from_le_bytes(data_read);
         Ok(result)
     }
     /// Verify address within RAM bounds
     fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), Error<B::Error, CS::Error>> {
-        if addr > 0x400 || (addr + (data_length as u16)) < 0xBFF {
+        if addr < 0x400 || (addr + (data_length as u16)) > 0xBFF {
             return Err(Error::InvalidRamAddress(addr));
         }
         Ok(())

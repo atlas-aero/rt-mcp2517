@@ -1,7 +1,8 @@
 use modular_bitfield_msb::prelude::*;
-
 /// Fourth byte of FIFO Control register
 #[bitfield]
+#[derive(Default)]
+#[repr(u8)]
 pub struct FifoControlReg3 {
     pub plsize: B3,
     fsize: B5,
@@ -9,7 +10,7 @@ pub struct FifoControlReg3 {
 impl FifoControlReg3 {
     /// set FIFO size (number of messages 1-32)
     pub fn with_fifo_size(mut self, value: u8) -> Self {
-        let size = value.max(1).min(32);
+        let size = value.clamp(1, 32);
         self.set_fsize(size - 1);
         self
     }
@@ -18,14 +19,10 @@ impl FifoControlReg3 {
         self.fsize() + 1
     }
 }
-impl Default for FifoControlReg3 {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// Third byte of FIFO Control register
 #[bitfield]
+#[derive(Default)]
 #[repr(u8)]
 pub struct FifoControlReg2 {
     #[skip]
@@ -36,6 +33,7 @@ pub struct FifoControlReg2 {
 
 /// Second byte of FIFO Control register
 #[bitfield]
+#[derive(Default)]
 #[repr(u8)]
 pub struct FifoControlReg1 {
     #[skip]
@@ -47,6 +45,7 @@ pub struct FifoControlReg1 {
 
 /// First byte of FIFO Control register
 #[bitfield]
+#[derive(Default)]
 #[repr(u8)]
 pub struct FifoControlReg0 {
     pub txen: bool,
@@ -61,6 +60,7 @@ pub struct FifoControlReg0 {
 
 /// Second byte of FIFO Status register
 #[bitfield]
+#[derive(Default)]
 #[repr(u8)]
 pub struct FifoStatusReg1 {
     #[skip]
@@ -68,7 +68,9 @@ pub struct FifoStatusReg1 {
     pub fifoci: B5,
 }
 /// First byte of FIFO Status register
+
 #[bitfield]
+#[derive(Default)]
 #[repr(u8)]
 pub struct FifoStatusReg0 {
     pub txabt: bool,

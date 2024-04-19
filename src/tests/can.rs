@@ -3,9 +3,12 @@ use crate::config::{
     ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
     RetransmissionAttempts, SystemClockDivisor,
 };
+use crate::message::TxMessage;
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
+use embedded_can::{ExtendedId, Id};
+use mockall::mock;
 
 #[test]
 fn test_configure_correct() {
@@ -142,6 +145,59 @@ fn test_configure_mode_timeout() {
         ConfigError::ConfigurationModeTimeout,
         controller.configure(&Configuration::default(), &clock).unwrap_err()
     );
+}
+
+const EXTENDED_ID: u32 = 0x14C92A2B;
+#[test]
+fn test_transmit() {
+    let mut mocks = Mocks::default();
+
+    let message_payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
+    let tx_message = TxMessage::new(Id::Extended(identifier), &message_payload, false, false).unwrap();
+    let tx_message_copy = tx_message.clone();
+
+    // mock fifo status register read byte 0
+    mocks.mock_register_read::<0b0000_0001>([0x30, 0x6C]);
+
+    // mock read operation status
+    mocks.mock_register_read::<0b1100_0000>([0x30, 0x2]);
+
+    // mock fifo user address register read (reading 32 bits) --> address = 0x4A2
+    mocks.mock_read32::<0x00_00_04_A2>([0x30, 0x70]);
+
+    // mock writing message in RAM specified by fifo user address (0x4A2)
+    // transfer cmd+tx_header
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        let mut cmd_and_header_buffer = [0u8; 10];
+        cmd_and_header_buffer[0] = 0x24;
+        cmd_and_header_buffer[1] = 0xA2;
+        cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
+
+        assert_eq!(cmd_and_header_buffer, data);
+        Ok(&[0u8; 10])
+    });
+    // transfer payload
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!(message_payload, data);
+        Ok(&[0u8; 8])
+    });
+
+    // mock setting of bits txreq and uinc
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x69, 0x03], data);
+        Ok(&[0u8; 3])
+    });
+
+    mocks.pin_cs.expect_set_low().times(2).return_const(Ok(()));
+    mocks.pin_cs.expect_set_high().times(2).return_const(Ok(()));
+
+    // mock reading of fifo control register
+    mocks.mock_register_read::<0x00>([0x30, 0x69]);
+
+    let result = mocks.into_controller().transmit(tx_message_copy);
+    assert_eq!(result, Ok(()));
 }
 
 #[test]
@@ -357,6 +413,24 @@ impl Mocks {
         self.bus.expect_transfer().times(1).returning(move |data| {
             assert_eq!(expected_buffer, data);
             Ok(&[0x0, 0x0, REG])
+        });
+
+        self.pin_cs.expect_set_low().times(1).return_const(Ok(()));
+        self.pin_cs.expect_set_high().times(1).return_const(Ok(()));
+    }
+    pub fn mock_read32<const REG: u32>(&mut self, expected_command: [u8; 2]) {
+        let expected_buffer = [expected_command[0], expected_command[1], 0u8, 0u8, 0u8, 0u8];
+
+        self.bus.expect_transfer().times(1).returning(move |data| {
+            assert_eq!(expected_buffer, data);
+            Ok(&[
+                0x0,
+                0x0,
+                REG as u8,
+                (REG >> 8) as u8,
+                (REG >> 16) as u8,
+                (REG >> 24) as u8,
+            ])
         });
 
         self.pin_cs.expect_set_low().times(1).return_const(Ok(()));
