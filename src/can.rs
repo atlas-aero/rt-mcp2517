@@ -162,18 +162,19 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
     /// Enable filter for corresponding RX FIFO
     pub fn enable_filter(&mut self, fifo_index: u8, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
-        let filter_reg = Self::filter_control_register_byte(filter_index);
+        let filter_control_reg = Self::filter_control_register_byte(filter_index);
         // Filter must be disabled to modify FmBP
         self.disable_filter(filter_index)?;
-        self.write_register(filter_reg, fifo_index)?;
+        // Write index of fifo where the message that matches the filter is stored in
+        self.write_register(filter_control_reg, fifo_index)?;
         // Set FLTENm to enable filter
-        self.write_register(filter_reg, (1 << 7) & fifo_index)?;
+        self.write_register(filter_control_reg, (1 << 7) | fifo_index)?;
         Ok(())
     }
 
     pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
         let filter_reg = Self::filter_control_register_byte(filter_index);
-        self.write_register(filter_reg, !(1 << 7))?;
+        self.write_register(filter_reg, 0x00)?;
         Ok(())
     }
     /// Set corresponding filter object

@@ -68,6 +68,25 @@ fn test_configure_correct() {
         Ok(&[0x0, 0x0, 0x0])
     });
 
+    // Enable filter for RX Fifo
+    // filter disable
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0x00], data);
+        Ok(&[0u8, 0u8, 0u8])
+    });
+
+    // write F02BP
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0x01], data);
+        Ok(&[0u8, 0u8, 0u8])
+    });
+
+    // enable filter
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0b1000_0001], data);
+        Ok(&[0u8, 0u8, 0u8])
+    });
+
     // Request normal CAN 2.0B mode
     bus.expect_transfer().times(1).returning(move |data| {
         assert_eq!([0x20, 0x3, 0b0000_1110], data);
@@ -81,8 +100,8 @@ fn test_configure_correct() {
     });
 
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(10).return_const(Ok(()));
-    pin_cs.expect_set_high().times(10).return_const(Ok(()));
+    pin_cs.expect_set_low().times(13).return_const(Ok(()));
+    pin_cs.expect_set_high().times(13).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     controller
@@ -236,6 +255,25 @@ fn test_request_mode_timeout() {
     // Writing configuration registers
     bus.expect_transfer().times(5).returning(move |_| Ok(&[0x0, 0x0, 0x0]));
 
+    // Enable filter for RX Fifo
+    // filter disable
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0x00], data);
+        Ok(&[0u8, 0u8, 0u8])
+    });
+
+    // write F02BP
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0x01], data);
+        Ok(&[0u8, 0u8, 0u8])
+    });
+
+    // enable filter
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0b1000_0001], data);
+        Ok(&[0u8, 0u8, 0u8])
+    });
+
     // Request normal CAN FD mode
     bus.expect_transfer().times(1).returning(move |data| {
         assert_eq!([0x20, 0x3, 0b0000_1000], data);
@@ -249,8 +287,8 @@ fn test_request_mode_timeout() {
     });
 
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(11).return_const(Ok(()));
-    pin_cs.expect_set_high().times(11).return_const(Ok(()));
+    pin_cs.expect_set_low().times(14).return_const(Ok(()));
+    pin_cs.expect_set_high().times(14).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     assert_eq!(
