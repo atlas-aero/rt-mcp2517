@@ -94,12 +94,6 @@ pub struct FilterMaskReg {
     pub msid: B11,
 }
 
-impl Default for FilterMaskReg {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// filter object
 #[bitfield]
 #[repr(u32)]

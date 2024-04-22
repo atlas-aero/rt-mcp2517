@@ -19,11 +19,7 @@ const FIFO_RX_INDEX: u8 = 1;
 
 /// FIFO index for transmitting CAN messages
 const FIFO_TX_INDEX: u8 = 2;
-#[derive(Debug, PartialEq)]
-pub enum TestError<B, CS> {
-    TestCSErr(CS),
-    TestBErr(B),
-}
+
 /// General SPI Errors
 #[derive(Debug, PartialEq)]
 pub enum BusError<B, CS> {
@@ -49,11 +45,16 @@ pub enum ConfigError<B, CS> {
     /// Device did not enter given request mode within timeout of 2 ms
     RequestModeTimeout,
 }
+
 #[derive(Debug, PartialEq)]
 pub enum Error<B, CS> {
+    /// Configuration error
     ConfigErr(ConfigError<B, CS>),
+    /// SPI bus transfer error
     BusErr(BusError<B, CS>),
+    /// Invalid payload bytes length error
     InvalidPayloadLength(usize),
+    /// Invalid Ram Address region error
     InvalidRamAddress(u16),
 }
 
@@ -225,12 +226,14 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(())
     }
 
+    /// Reset internal register to default and switch to Configuration mode
     pub fn reset(&mut self) -> Result<(), BusError<B::Error, CS::Error>> {
         let mut buffer = self.cmd_buffer(0u16, Operation::Reset);
         self.transfer(&mut buffer)?;
         Ok(())
     }
 
+    /// Transmit CAN Message
     pub fn transmit(&mut self, message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
         // make sure there is space for new message in TX FIFO
         // read byte 0 of TX FIFO status register
@@ -306,9 +309,6 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        //      self.bus
-        //          .transfer(&mut message.payload[..message.length])
-        //          .map_err(TransferError)?;
         self.bus.transfer(&mut message.buff).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
         Ok(())
