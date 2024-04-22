@@ -300,6 +300,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     fn fifo_status_register(fifo_index: u8) -> u16 {
         0x60 + 12 * (fifo_index as u16 - 1)
     }
+
     /// Returns the address of fifo user address register for the given index
     fn fifo_user_address_register(fifo_index: u8) -> u16 {
         0x64 + 12 * (fifo_index as u16 - 1)

@@ -8,7 +8,6 @@ use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
 use embedded_can::{ExtendedId, Id};
-use mockall::mock;
 
 #[test]
 fn test_configure_correct() {
