@@ -4,9 +4,8 @@ use crate::config::{
     RetransmissionAttempts, SystemClockDivisor,
 };
 use crate::filter::Filter;
-use crate::message::{RxHeader, TxMessage, STANDARD_IDENTIFIER_MASK};
+use crate::message::{RxHeader, TxMessage};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
-use crate::registers::{FilterMaskReg, FilterObjectReg};
 use crate::status::OperationMode;
 use alloc::vec;
 use embedded_can::{ExtendedId, Id, StandardId};
