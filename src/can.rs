@@ -210,6 +210,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(())
     }
 
+    /// 4-byte SFR write
     fn write32(&mut self, register: u16, value: u32) -> Result<(), BusError<B::Error, CS::Error>> {
         let mut buffer = [0u8; 6];
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
@@ -330,7 +331,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(res)
     }
 
-    /// 4-byte register read
+    /// 4-byte SFR read
     fn read32(&mut self, register: u16) -> Result<u32, BusError<B::Error, CS::Error>> {
         // create 6 byte cmd buffer (2 bytes cmd+addr , 4 bytes for register value)
         let mut buffer = [0u8; 6];
