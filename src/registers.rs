@@ -1,4 +1,5 @@
 use modular_bitfield_msb::prelude::*;
+
 /// Fourth byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]
@@ -84,6 +85,7 @@ pub struct FifoStatusReg0 {
 }
 /// filter mask
 #[bitfield]
+#[derive(Default, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub struct FilterMaskReg {
     #[skip]
@@ -96,6 +98,7 @@ pub struct FilterMaskReg {
 
 /// filter object
 #[bitfield]
+#[derive(Default, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub struct FilterObjectReg {
     #[skip]

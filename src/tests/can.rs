@@ -3,11 +3,13 @@ use crate::config::{
     ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
     RetransmissionAttempts, SystemClockDivisor,
 };
-use crate::message::TxMessage;
+use crate::filter::Filter;
+use crate::message::{RxHeader, TxMessage, STANDARD_IDENTIFIER_MASK};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
+use crate::registers::{FilterMaskReg, FilterObjectReg};
 use crate::status::OperationMode;
 use alloc::vec;
-use embedded_can::{ExtendedId, Id};
+use embedded_can::{ExtendedId, Id, StandardId};
 
 #[test]
 fn test_configure_correct() {
@@ -165,7 +167,9 @@ fn test_configure_mode_timeout() {
     );
 }
 
-const EXTENDED_ID: u32 = 0x14C92A2B;
+const EXTENDED_ID: u32 = 0x14C92A2B; //0b000(1_0100_1100_10)(01_0010_1010_0010_1011)
+const STANDARD_ID: u16 = 0x6A5;
+
 #[test]
 fn test_transmit() {
     let mut mocks = Mocks::default();
@@ -219,6 +223,51 @@ fn test_transmit() {
 }
 
 #[test]
+fn test_receive() {
+    let mut mocks = Mocks::default();
+
+    let id = ExtendedId::new(EXTENDED_ID).unwrap();
+
+    // custom Rx message header for testing
+    let message_header = RxHeader::new_test_cfg(Id::Extended(id));
+
+    let mut message_buff = [0u8; 16];
+
+    // status register read
+    mocks.mock_register_read::<0b0000_0001>([0x30, 0x60]);
+
+    // user address register read
+    mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64]);
+
+    // Message read from RAM address 0x47C
+    //transfer cmd+address
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x34, 0x7C], data);
+        Ok(&[0u8; 2])
+    });
+
+    // transfer message_buff where message bytes are placed
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0u8; 16], data);
+        Ok(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8])
+    });
+
+    // set uinc bit in Rx FIFO control register
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x5D, 0b0000_0001], data);
+        Ok(&[0u8; 3])
+    });
+
+    mocks.pin_cs.expect_set_low().times(2).return_const(Ok(()));
+    mocks.pin_cs.expect_set_high().times(2).return_const(Ok(()));
+
+    let result = mocks.into_controller().receive(&mut message_buff).unwrap();
+
+    assert_eq!(result[..8], message_header.into_bytes());
+    assert_eq!(result[8..], [1, 2, 3, 4, 5, 6, 7, 8]);
+}
+
+#[test]
 fn test_reset_command() {
     let mut mocks = Mocks::default();
     mocks.bus.expect_transfer().times(1).returning(move |data| {
@@ -231,6 +280,81 @@ fn test_reset_command() {
     let result = mocks.into_controller().reset();
     assert!(result.is_ok());
 }
+
+#[test]
+fn test_set_filter_object_standard_id() {
+    let id_standard = StandardId::new(STANDARD_ID).unwrap();
+    let mut filter = Filter::new(Id::Standard(id_standard), 1).unwrap();
+
+    // mask 2 lsb of standard id -> MSID <1:0> should be set
+    filter.set_mask_standard_id(0b000_0000_0011);
+
+    // MIDE should be set and EXIDE should be cleared
+    filter.match_standard_only();
+
+    let mut mocks = Mocks::default();
+
+    // disable filter 0
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD1, 0x00], data);
+        Ok(&[0u8; 3])
+    });
+
+    // write filter value
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xF8, 0xA5, 0x6, 0x0, 0x0], data);
+        Ok(&[0u8; 2])
+    });
+
+    // write mask value
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xFC, 0x3, 0u8, 0u8, 0x40], data);
+        Ok(&[0u8; 6])
+    });
+
+    mocks.pin_cs.expect_set_low().times(3).return_const(Ok(()));
+    mocks.pin_cs.expect_set_high().times(3).return_const(Ok(()));
+
+    let result = mocks.into_controller().set_filter_object(filter);
+
+    assert!(result.is_ok());
+}
+#[test]
+fn test_set_filter_object_extended_id() {
+    let id_extended = ExtendedId::new(EXTENDED_ID).unwrap();
+    let mut filter = Filter::new(Id::Extended(id_extended), 0).unwrap();
+
+    // mask the 2 msb of extended id -> MSID<10:9> should be set
+    filter.set_mask_extended_id(0b1_1000_0000_0000_0000_0000_0000_0000);
+
+    let mut mocks = Mocks::default();
+
+    // disable filter 0
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xD0, 0x00], data);
+        Ok(&[0u8; 3])
+    });
+
+    // write filter value
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xF0, 0x32, 0x5D, 0x51, 0x09], data);
+        Ok(&[0u8; 2])
+    });
+
+    // write mask value
+    mocks.bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x21, 0xF4, 0u8, 0x6, 0u8, 0u8], data);
+        Ok(&[0u8; 6])
+    });
+
+    mocks.pin_cs.expect_set_low().times(3).return_const(Ok(()));
+    mocks.pin_cs.expect_set_high().times(3).return_const(Ok(()));
+
+    let result_extended = mocks.into_controller().set_filter_object(filter);
+
+    assert!(result_extended.is_ok());
+}
+
 #[test]
 fn test_request_mode_timeout() {
     let clock = TestClock::new(vec![
