@@ -152,31 +152,54 @@ impl TxMessage {
         })
     }
 }
+
 /// Receive message object header
 #[bitfield(bits = 64)]
+#[derive(Default, PartialEq, Eq, Debug)]
+#[repr(u64)]
 pub struct RxHeader {
     // R0
     #[skip]
     __: B2,
     sid11: bool,
-    eid: B18,
-    sid: B11,
-    // R1
+    extended_identifier: B18,
+    standard_identifier: B11,
     #[skip]
     __: B16,
-    filhit: B5,
+    filter_hit: B5,
     #[skip]
     __: B2,
-    esi: bool,
-    fdf: bool,
-    brs: bool,
-    rtr: bool,
-    ide: bool,
-    dlc: DLC,
+    error_status_indicator: bool,
+    fd_frame: bool,
+    bit_rate_switch: bool,
+    remote_transmission_request: bool,
+    identifier_extension_flag: bool,
+    data_length_code: DLC,
 }
-impl Default for RxHeader {
-    fn default() -> Self {
-        Self::new()
+
+impl RxHeader {
+    fn get_id(&self) -> Id {
+        if self.identifier_extension_flag() {
+            let id = ((self.standard_identifier() as u32) << 18) | (self.extended_identifier());
+            let extended_id = ExtendedId::new(id);
+            Id::Extended(extended_id.unwrap())
+        } else {
+            let id = StandardId::new(self.standard_identifier());
+            Id::Standard(id.unwrap())
+        }
+    }
+    #[cfg(test)]
+    pub fn new_test_cfg(identifier: Id) -> Self {
+        match identifier {
+            Id::Extended(eid) => Self::new()
+                .with_data_length_code(DLC::Eight)
+                .with_standard_identifier((eid.as_raw() >> 18) as u16 & STANDARD_IDENTIFIER_MASK)
+                .with_extended_identifier(eid.as_raw() & EXTENDED_IDENTIFIER_MASK)
+                .with_identifier_extension_flag(true),
+            Id::Standard(sid) => Self::new()
+                .with_data_length_code(DLC::Eight)
+                .with_standard_identifier(sid.as_raw()),
+        }
     }
 }
 
