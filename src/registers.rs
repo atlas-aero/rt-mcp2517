@@ -8,6 +8,7 @@ pub struct FifoControlReg3 {
     pub plsize: B3,
     fsize: B5,
 }
+
 impl FifoControlReg3 {
     /// set FIFO size (number of messages 1-32)
     pub fn with_fifo_size(mut self, value: u8) -> Self {
@@ -68,8 +69,8 @@ pub struct FifoStatusReg1 {
     __: B3,
     pub fifoci: B5,
 }
-/// First byte of FIFO Status register
 
+/// First byte of FIFO Status register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
