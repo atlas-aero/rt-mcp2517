@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![allow(dead_code)]
+#![allow(clippy::identity_op)]
 
 extern crate alloc;
 

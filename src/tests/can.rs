@@ -238,7 +238,6 @@ fn test_transmit() {
         .in_sequence(&mut seq);
 
     // mock setting of bits txreq and uinc
-
     mocks
         .pin_cs
         .expect_set_low()
@@ -321,7 +320,6 @@ fn test_receive() {
 #[test]
 fn test_reset_command() {
     let mut mocks = Mocks::default();
-
     let mut seq = Sequence::new();
 
     mocks.bus.expect_transfer().times(1).returning(move |data| {
@@ -669,6 +667,8 @@ impl Mocks {
 
         self.pin_cs.expect_set_high().times(1).return_const(Ok(())).in_sequence(seq);
     }
+
+    /// mocks 4-byte register read
     pub fn mock_read32<const REG: u32>(&mut self, expected_command: [u8; 2], seq: &mut Sequence) {
         let expected_buffer = [expected_command[0], expected_command[1], 0u8, 0u8, 0u8, 0u8];
 
