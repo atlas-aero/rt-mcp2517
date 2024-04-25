@@ -7,6 +7,7 @@ use crate::message::TxMessage;
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
+use bytes::{BufMut, BytesMut};
 use embedded_can::{ExtendedId, Id};
 use mockall::Sequence;
 
@@ -152,11 +153,12 @@ const EXTENDED_ID: u32 = 0x14C92A2B;
 fn test_transmit() {
     let mut mocks = Mocks::default();
     let mut seq = Sequence::new();
-
-    let message_payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+    let payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+    let mut payload_bytes = BytesMut::with_capacity(8);
+    payload_bytes.put_slice(&payload);
 
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
-    let tx_message = TxMessage::new(Id::Extended(identifier), &message_payload, false, false).unwrap();
+    let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, false, false).unwrap();
     let tx_message_copy = tx_message.clone();
 
     // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
@@ -201,7 +203,7 @@ fn test_transmit() {
         .expect_transfer()
         .times(1)
         .returning(move |data| {
-            assert_eq!(message_payload, data);
+            assert_eq!(payload, data);
             Ok(&[0u8; 8])
         })
         .in_sequence(&mut seq);

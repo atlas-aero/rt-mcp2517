@@ -91,7 +91,7 @@ pub struct TxMessage {
 }
 
 impl TxMessage {
-    pub fn new(identifier: Id, data: &[u8], can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
+    pub fn new(identifier: Id, mut data: BytesMut, can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
         let mut header = TxHeader::new();
         let mut payload_length = data.len();
 
@@ -108,11 +108,10 @@ impl TxMessage {
             debug!("Maximum of 8 data bytes allowed for CAN2.0 message. Current size: {payload_length}");
             return Err(DLCError::InvalidLength(data.len()));
         }
+
         // make sure length divisible by four (word size)
         let length = (payload_length + 3) & !3;
-
-        let mut bytes = BytesMut::with_capacity(payload_length);
-        bytes.extend_from_slice(data);
+        data.resize(length, 0);
 
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;
@@ -130,7 +129,7 @@ impl TxMessage {
         }
         Ok(TxMessage {
             header,
-            buff: bytes,
+            buff: data,
             length,
         })
     }
