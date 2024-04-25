@@ -47,6 +47,7 @@ pub enum ConfigError<B, CS> {
     RequestModeTimeout,
 }
 
+/// Possible errors transmitting CAN message
 #[derive(Debug, PartialEq)]
 pub enum Error<B, CS> {
     /// Configuration error
@@ -239,13 +240,14 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn transmit(&mut self, message: TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
         // make sure there is space for new message in TX FIFO
         // read byte 0 of TX FIFO status register
+        let status_reg_addr = Self::fifo_status_register(FIFO_TX_INDEX);
 
-        let mut txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
+        let mut txfifo_status_byte0 = self.read_register(status_reg_addr)?;
         let mut txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
 
         // block until there is room available for new message in TX FIFO
         while !txfifo_status_reg0.tfnrfnif() {
-            txfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_TX_INDEX))?;
+            txfifo_status_byte0 = self.read_register(status_reg_addr)?;
             txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
         }
 
@@ -258,20 +260,21 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // get address in which to write next message in TX FIFO (should not be read in configuration mode)
         let address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
+        // get address of TX FIFO control register byte 1
+        let fifo_control_reg1 = Self::fifo_control_register(FIFO_TX_INDEX) + 1;
 
         // load message in TX FIFO
         self.write_fifo(address as u16, message)?;
         // Request transmission (set txreq) and set uinc in TX FIFO control register byte 1
-        self.write_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1, 0x03)?;
+        self.write_register(fifo_control_reg1, 0x03)?;
 
         // read TX FIFO control register byte 1
-
-        let mut txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
+        let mut txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
         let mut txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
 
         // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
         while txfifo_control_reg.txreq() {
-            txfifo_control_byte1 = self.read_register(Self::fifo_control_register(FIFO_TX_INDEX) + 1)?;
+            txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
             txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
         }
         Ok(())
