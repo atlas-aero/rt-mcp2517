@@ -259,6 +259,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         let result = u32::from_le_bytes(data_read);
         Ok(result)
     }
+
     /// Verify address within RAM bounds
     fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), Error<B::Error, CS::Error>> {
         if addr < 0x400 || (addr + (data_length as u16)) > 0xBFF {

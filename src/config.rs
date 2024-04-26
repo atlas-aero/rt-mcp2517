@@ -154,6 +154,8 @@ pub struct FifoConfiguration {
     /// Enables/Disables TX FIFO
     pub tx_enable: bool,
 }
+
+/// Permitted sizes of the message payload for a FIFO
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PayloadSize {
     EightBytes = 0b000,
