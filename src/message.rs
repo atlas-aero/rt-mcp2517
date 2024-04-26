@@ -96,8 +96,11 @@ pub struct TxHeader {
 /// Transmit Message Object
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxMessage {
+    /// first 2 bytes of Transmit Message Object
     pub(crate) header: TxHeader,
+    /// Payload bytes of Message Object
     pub(crate) buff: BytesMut,
+    /// Size of payload bytes
     pub(crate) length: usize,
 }
 
