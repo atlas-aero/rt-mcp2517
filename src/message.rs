@@ -10,6 +10,7 @@ pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
 /// Data length code
 #[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 #[bits = 4]
 pub enum DLC {
     Zero,
@@ -29,6 +30,8 @@ pub enum DLC {
     FortyEight,
     SixtyFour,
 }
+
+/// Invalid data length code error
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DLCError {
     InvalidLength(usize),
@@ -65,18 +68,28 @@ pub struct TxHeader {
     // T0
     #[skip]
     __: B2,
+    /// standard ID in FD mode can be extended to 12 bits if sid11 is set
     pub sid11: bool,
+    /// 18 lsb of extended ID
     pub extended_identifier: B18,
+    /// standard ID bits or msb 11 bits of extended ID
     pub standard_identifier: B11,
     // T1
     #[skip]
     __: B16,
+    /// Sequence keeping track of transmitted messages in Transmit Event FIFO
     pub sequence: B7,
+    /// In normal ESI mode, set if node is error passive, cleared if node is error active
     pub error_status_indicator: bool,
+    /// Bit distinguishing between CAN and CAN FD formats
     pub fd_frame: bool,
+    /// Enables bit rate switching in CAN FD frames
     pub bit_rate_switch: bool,
+    /// Set if the frame is a RTR frame
     pub remote_transmission_request: bool,
+    /// Set if extended ID is used
     pub identifier_extension_flag: bool,
+    /// 4 bits identifying the payload length
     pub data_length_code: DLC,
 }
 
@@ -95,10 +108,12 @@ impl TxMessage {
 
         if can_fd {
             header.set_fd_frame(true);
+
             if data.len() > MAX_PAYLOAD_CAN_FD {
                 debug!("Maximum of 64 data bytes allowed for CANFD message. Current size: {payload_length}");
                 return Err(DLCError::InvalidLength(data.len()));
             }
+
             if bitrate_switch {
                 header.set_bit_rate_switch(true);
             }
@@ -109,6 +124,7 @@ impl TxMessage {
 
         // make sure length divisible by four (word size)
         let length = (payload_length + 3) & !3;
+
         data.resize(length, 0);
 
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
@@ -125,6 +141,7 @@ impl TxMessage {
                 header.set_identifier_extension_flag(true);
             }
         }
+
         Ok(TxMessage {
             header,
             buff: data,

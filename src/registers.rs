@@ -16,6 +16,7 @@ impl FifoControlReg3 {
         self.set_fsize(size - 1);
         self
     }
+
     /// get FIFO size
     pub fn fifo_size(&self) -> u8 {
         self.fsize() + 1
