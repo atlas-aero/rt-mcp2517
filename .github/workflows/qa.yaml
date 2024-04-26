@@ -47,8 +47,6 @@ jobs:
       - name: Build default features
         run: cargo build --release --features strict
 
-      - name: Build spin mutex feature
-        run: cargo build --release --features spin,strict
 
   no_std_atomics_builds:
     name: Build no_std targets with atomics support
@@ -63,8 +61,6 @@ jobs:
           - nightly
         feature:
           - default
-          - spin
-          - cortex-m
     steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -96,7 +92,6 @@ jobs:
           - nightly
         feature:
           - default
-          - cortex-m
     steps:
       - name: checkout
         uses: actions/checkout@v2
