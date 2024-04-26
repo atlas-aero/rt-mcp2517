@@ -89,7 +89,7 @@ jobs:
     strategy:
       matrix:
         target:
-          - thumbv6m-none-eabi
+          - thumbv7m-none-eabi
         rust:
           - stable
           - beta
