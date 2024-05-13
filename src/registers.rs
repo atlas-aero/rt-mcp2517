@@ -30,7 +30,9 @@ impl FifoControlReg3 {
 pub struct FifoControlReg2 {
     #[skip]
     __: B1,
+    /// Retransmission attempts bits
     pub txat: B2,
+    /// Message transmit priority bits
     pub txpri: B5,
 }
 
@@ -41,8 +43,11 @@ pub struct FifoControlReg2 {
 pub struct FifoControlReg1 {
     #[skip]
     __: B5,
+    /// FIFO Reset bit
     pub freset: bool,
+    /// Message Send Request bit
     pub txreq: bool,
+    /// Increment FIFO Head/Tail bit
     pub uinc: bool,
 }
 
@@ -51,13 +56,21 @@ pub struct FifoControlReg1 {
 #[derive(Default)]
 #[repr(u8)]
 pub struct FifoControlReg0 {
+    /// TX/RX FIFO Selection bit
     pub txen: bool,
+    /// Auto RTR Enable bit
     pub rtren: bool,
+    /// Received Message Time Stamp Enable bit
     pub rxtsen: bool,
+    /// Transmit Attempts Exhausted Interrupt Enable bit
     pub txatie: bool,
+    /// Overflow Interrupt Enable bit
     pub rxovie: bool,
+    /// Transmit/Receive FIFO Empty/Full Interrupt Enable bit
     pub tferffie: bool,
+    /// Transmit/Receive FIFO Half Empty/Half Full Interrupt Enable bit
     pub tfhrfhie: bool,
+    /// Transmit/Receive FIFO Not Full/Not ETransmit/Receive FIFO Not Full/Not Empty Interrupt Flag bitmpty Interrupt Enable bit
     pub tfnrfnie: bool,
 }
 
@@ -68,6 +81,7 @@ pub struct FifoControlReg0 {
 pub struct FifoStatusReg1 {
     #[skip]
     __: B3,
+    /// FIFO Message Index bits
     pub fifoci: B5,
 }
 
@@ -76,12 +90,20 @@ pub struct FifoStatusReg1 {
 #[derive(Default)]
 #[repr(u8)]
 pub struct FifoStatusReg0 {
+    /// Message Aborted Status bit
     pub txabt: bool,
+    /// Message Lost Arbitration Status bit
     pub txlarb: bool,
+    /// Error Detected During Transmission bit
     pub txerr: bool,
+    /// Transmit Attempts Exhausted Interrupt Pending bit
     pub txatif: bool,
+    /// Receive FIFO Overflow Interrupt Flag bit
     pub rxovif: bool,
+    /// Transmit/Receive FIFO Empty/Full Interrupt Flag bit
     pub tferffif: bool,
+    /// Transmit/Receive FIFO Half Empty/Half Full Interrupt Flag bit
     pub tfhrfhif: bool,
+    /// Transmit/Receive FIFO Not Full/Not Empty Interrupt Flag bit
     pub tfnrfnif: bool,
 }

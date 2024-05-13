@@ -1,11 +1,14 @@
-use bytes::BytesMut;
+use bytes::Bytes;
 use embedded_can::Id;
 use log::debug;
 use modular_bitfield_msb::prelude::*;
 
 pub const STANDARD_IDENTIFIER_MASK: u16 = 0x7FF;
+
 pub const EXTENDED_IDENTIFIER_MASK: u32 = 0x3FFFF;
+
 pub const MAX_PAYLOAD_CAN_2_0: usize = 8;
+
 pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
 /// Data length code
@@ -93,22 +96,21 @@ pub struct TxHeader {
     pub data_length_code: DLC,
 }
 
-impl TxHeader {}
-
 /// Transmit Message Object
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxMessage {
     /// first 2 bytes of Transmit Message Object
     pub(crate) header: TxHeader,
     /// Payload bytes of Message Object
-    pub(crate) buff: BytesMut,
+    pub(crate) buff: Bytes,
     /// Size of payload bytes
     pub(crate) length: usize,
 }
 
 impl TxMessage {
-    pub fn new(identifier: Id, mut data: BytesMut, can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
+    pub fn new(identifier: Id, data: Bytes, can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
         let mut header = TxHeader::new();
+
         let mut payload_length = data.len();
 
         if can_fd {
@@ -129,8 +131,6 @@ impl TxMessage {
 
         // make sure length divisible by four (word size)
         let length = (payload_length + 3) & !3;
-
-        data.resize(length, 0);
 
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;

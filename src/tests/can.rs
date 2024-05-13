@@ -7,7 +7,7 @@ use crate::message::TxMessage;
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
-use bytes::{BufMut, BytesMut};
+use bytes::Bytes;
 use embedded_can::{ExtendedId, Id};
 use mockall::Sequence;
 
@@ -154,8 +154,7 @@ fn test_transmit() {
     let mut mocks = Mocks::default();
     let mut seq = Sequence::new();
     let payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
-    let mut payload_bytes = BytesMut::with_capacity(8);
-    payload_bytes.put_slice(&payload);
+    let payload_bytes = Bytes::copy_from_slice(&payload);
 
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
     let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, false, false).unwrap();
@@ -246,7 +245,7 @@ fn test_transmit() {
     // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
-    let result = mocks.into_controller().transmit(tx_message_copy);
+    let result = mocks.into_controller().transmit(&tx_message_copy);
     assert!(result.is_ok());
 }
 
