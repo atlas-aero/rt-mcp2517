@@ -212,7 +212,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         let operation_status = self.read_operation_status()?;
 
         if message.buff.len() > 8 && operation_status.mode != OperationMode::NormalCANFD {
-            return Err(Error::InvalidPayloadLength(message.length));
+            return Err(Error::InvalidPayloadLength(message.buff.len()));
         }
 
         // get address in which to write next message in TX FIFO (should not be read in configuration mode)
@@ -248,7 +248,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     where
         T: MessageType<L>,
     {
-        self.verify_ram_address(register, message.length)?;
+        self.verify_ram_address(register, message.buff.len())?;
 
         let mut buffer = [0u8; 10];
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);

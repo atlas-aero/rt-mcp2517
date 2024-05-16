@@ -46,7 +46,6 @@ fn test_dlc_success() {
 
     assert_eq!(message.header.data_length_code(), DLC::Sixteen);
     assert!(message.header.fd_frame());
-    assert_eq!(message.length, 16);
 
     let header_bytes = message.header.into_bytes();
 
