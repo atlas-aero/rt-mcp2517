@@ -255,7 +255,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // copy message data into mutable buffer
         let mut data = [0u8; L];
-        data.copy_from_slice(&message.buff.as_ref()[..L]);
+        data.copy_from_slice(message.buff.as_ref());
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
