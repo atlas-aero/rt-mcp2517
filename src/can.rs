@@ -244,10 +244,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
 
         // copy message data into mutable buffer
-        //(BytesMut used due to unknown length of message object at compile time)
-        let mut data = BytesMut::new();
-        data.resize(message.length, 0);
-        data.copy_from_slice(message.buff.as_ref());
+        let mut data = [0u8; 64];
+
+        for (scr, dst) in message.buff.as_ref().iter().zip(data.iter_mut()) {
+            *dst = *scr;
+        }
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
@@ -255,7 +256,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(&mut data).map_err(TransferError)?;
+        self.bus.transfer(&mut data[..message.length]).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
         Ok(())
