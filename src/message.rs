@@ -132,8 +132,6 @@ pub struct TxMessage<T, const MAX_LENGTH: usize> {
     pub(crate) header: TxHeader,
     /// Payload bytes of Message Object
     pub(crate) buff: Bytes,
-    /// Size of payload bytes
-    pub(crate) length: usize,
     /// CAN message type (CAN 2.0 or CAN FD)
     pub(crate) message_type: T,
 }
@@ -170,7 +168,6 @@ impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGT
         Ok(TxMessage {
             header,
             buff: data,
-            length: payload_length,
             message_type,
         })
     }

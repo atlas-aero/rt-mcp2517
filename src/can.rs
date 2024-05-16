@@ -211,7 +211,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         // make sure length of payload is consistent with CAN operation mode
         let operation_status = self.read_operation_status()?;
 
-        if message.length > 8 && operation_status.mode != OperationMode::NormalCANFD {
+        if message.buff.len() > 8 && operation_status.mode != OperationMode::NormalCANFD {
             return Err(Error::InvalidPayloadLength(message.length));
         }
 
