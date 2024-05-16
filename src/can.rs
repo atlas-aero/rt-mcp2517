@@ -1,7 +1,7 @@
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
-use crate::message::TxMessage;
+use crate::message::{MessageType, TxMessage};
 use crate::registers::{FifoControlReg1, FifoStatusReg0};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use bytes::BytesMut;
@@ -191,7 +191,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
 
     /// Transmit CAN Message
-    pub fn transmit(&mut self, message: &TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
+    pub fn transmit<T, const L: usize>(&mut self, message: &TxMessage<T, L>) -> Result<(), Error<B::Error, CS::Error>>
+    where
+        T: MessageType<L>,
+    {
         // make sure there is space for new message in TX FIFO
         // read byte 0 of TX FIFO status register
         let status_reg_addr = Self::fifo_status_register(FIFO_TX_INDEX);
@@ -219,7 +222,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         let fifo_control_reg1 = Self::fifo_control_register(FIFO_TX_INDEX) + 1;
 
         // load message in TX FIFO
-        self.write_fifo(address as u16, message)?;
+        self.write_fifo::<T, L>(address as u16, message)?;
 
         // Request transmission (set txreq) and set uinc in TX FIFO control register byte 1
         self.write_register(fifo_control_reg1, 0x03)?;
@@ -237,18 +240,22 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
 
     /// Insert message object in TX FIFO
-    fn write_fifo(&mut self, register: u16, message: &TxMessage) -> Result<(), Error<B::Error, CS::Error>> {
+    fn write_fifo<T, const L: usize>(
+        &mut self,
+        register: u16,
+        message: &TxMessage<T, L>,
+    ) -> Result<(), Error<B::Error, CS::Error>>
+    where
+        T: MessageType<L>,
+    {
         self.verify_ram_address(register, message.length)?;
 
         let mut buffer = [0u8; 10];
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
 
         // copy message data into mutable buffer
-        let mut data = [0u8; 64];
-
-        for (scr, dst) in message.buff.as_ref().iter().zip(data.iter_mut()) {
-            *dst = *scr;
-        }
+        let mut data = [0u8; L];
+        data.copy_from_slice(&message.buff.as_ref()[..L]);
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
@@ -256,7 +263,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(&mut data[..message.length]).map_err(TransferError)?;
+        self.bus.transfer(&mut data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
         Ok(())

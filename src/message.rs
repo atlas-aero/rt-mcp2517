@@ -96,42 +96,62 @@ pub struct TxHeader {
     pub data_length_code: DLC,
 }
 
+/// CAN 2.0 message type
+#[derive(Debug, Copy, Clone)]
+pub struct Can20 {}
+
+impl MessageType<8> for Can20 {
+    fn setup_header(&self, _header: &mut TxHeader) -> Result<(), DLCError> {
+        Ok(())
+    }
+}
+
+/// CAN FD message type
+#[derive(Debug, Copy, Clone)]
+pub struct CanFd {
+    pub bitrate_switch: bool,
+}
+
+impl MessageType<64> for CanFd {
+    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError> {
+        header.set_bit_rate_switch(self.bitrate_switch);
+        header.set_fd_frame(true);
+        Ok(())
+    }
+}
+
+pub trait MessageType<const MAX_LENGTH: usize> {
+    /// Setup CAN message header depending on message type
+    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError>;
+}
+
 /// Transmit Message Object
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct TxMessage {
+pub struct TxMessage<T, const MAX_LENGTH: usize> {
     /// first 2 bytes of Transmit Message Object
     pub(crate) header: TxHeader,
     /// Payload bytes of Message Object
     pub(crate) buff: Bytes,
     /// Size of payload bytes
     pub(crate) length: usize,
+    /// CAN message type (CAN 2.0 or CAN FD)
+    pub(crate) message_type: T,
 }
 
-impl TxMessage {
-    pub fn new(identifier: Id, data: Bytes, can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
+impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGTH> {
+    pub fn new(identifier: Id, data: Bytes, message_type: T) -> Result<Self, DLCError> {
         let mut header = TxHeader::new();
 
         let mut payload_length = data.len();
 
-        if can_fd {
-            header.set_fd_frame(true);
-
-            if data.len() > MAX_PAYLOAD_CAN_FD {
-                debug!("Maximum of 64 data bytes allowed for CANFD message. Current size: {payload_length}");
-                return Err(DLCError::InvalidLength(data.len()));
-            }
-
-            if bitrate_switch {
-                header.set_bit_rate_switch(true);
-            }
-        } else if data.len() > MAX_PAYLOAD_CAN_2_0 {
-            debug!("Maximum of 8 data bytes allowed for CAN2.0 message. Current size: {payload_length}");
-            return Err(DLCError::InvalidLength(data.len()));
+        if payload_length > MAX_LENGTH {
+            debug!("Maximum of {MAX_LENGTH} bytes allowed. Current size: {payload_length} bytes");
+            return Err(DLCError::InvalidLength(payload_length));
         }
 
-        // make sure length divisible by four (word size)
-        let length = (payload_length + 3) & !3;
+        message_type.setup_header(&mut header)?;
 
+        // length used to choose the next supported DLC
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;
         }
@@ -150,7 +170,8 @@ impl TxMessage {
         Ok(TxMessage {
             header,
             buff: data,
-            length,
+            length: payload_length,
+            message_type,
         })
     }
 }

@@ -1,4 +1,4 @@
-use crate::message::{DLCError, TxMessage, DLC};
+use crate::message::{Can20, CanFd, DLCError, TxMessage, DLC};
 use bytes::Bytes;
 use embedded_can::Id;
 use embedded_can::{ExtendedId, StandardId};
@@ -12,7 +12,9 @@ fn test_extended_id() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 8]);
     let extended_id = ExtendedId::new(EXTENDED_ID).unwrap();
 
-    let message = TxMessage::new(Id::Extended(extended_id), payload_bytes, false, false).unwrap();
+    let msg_type = Can20 {};
+
+    let message = TxMessage::new(Id::Extended(extended_id), payload_bytes, msg_type).unwrap();
 
     assert!(message.header.identifier_extension_flag());
     assert_eq!(message.header.extended_identifier(), 0b01_0010_1010_0010_1011);
@@ -24,7 +26,9 @@ fn test_standard_id() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 8]);
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let message = TxMessage::new(Id::Standard(standard_id), payload_bytes, false, false).unwrap();
+    let msg_type = Can20 {};
+
+    let message = TxMessage::new(Id::Standard(standard_id), payload_bytes, msg_type).unwrap();
 
     assert!(!message.header.identifier_extension_flag());
     assert_eq!(message.header.extended_identifier(), 0b00_0000_0000_0000_0000);
@@ -36,7 +40,9 @@ fn test_dlc_success() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 13]);
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let message = TxMessage::new(Id::Standard(standard_id), payload_bytes, true, false).unwrap();
+    let msg_type = CanFd { bitrate_switch: false };
+
+    let message = TxMessage::new(Id::Standard(standard_id), payload_bytes, msg_type).unwrap();
 
     assert_eq!(message.header.data_length_code(), DLC::Sixteen);
     assert!(message.header.fd_frame());
@@ -55,10 +61,13 @@ fn test_dlc_error() {
     let payload_bytes_2_0 = Bytes::copy_from_slice(&data_2_0);
     let payload_bytes_fd = Bytes::copy_from_slice(&data_fd);
 
+    let can_msg_20 = Can20 {};
+    let can_msg_fd = CanFd { bitrate_switch: false };
+
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let message_2_0 = TxMessage::new(Id::Standard(standard_id), payload_bytes_2_0, false, false);
-    let message_fd = TxMessage::new(Id::Standard(standard_id), payload_bytes_fd, true, false);
+    let message_2_0 = TxMessage::new(Id::Standard(standard_id), payload_bytes_2_0, can_msg_20);
+    let message_fd = TxMessage::new(Id::Standard(standard_id), payload_bytes_fd, can_msg_fd);
 
     assert_eq!(message_2_0.unwrap_err(), DLCError::InvalidLength(10));
     assert_eq!(message_fd.unwrap_err(), DLCError::InvalidLength(65));

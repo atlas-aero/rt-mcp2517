@@ -3,7 +3,7 @@ use crate::config::{
     ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
     RetransmissionAttempts, SystemClockDivisor,
 };
-use crate::message::TxMessage;
+use crate::message::{Can20, CanFd, TxMessage};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
@@ -150,14 +150,16 @@ fn test_configure_mode_timeout() {
 
 const EXTENDED_ID: u32 = 0x14C92A2B;
 #[test]
-fn test_transmit() {
+fn test_transmit_can20() {
     let mut mocks = Mocks::default();
     let mut seq = Sequence::new();
     let payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
     let payload_bytes = Bytes::copy_from_slice(&payload);
 
+    let msg_type = Can20 {};
+
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
-    let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, false, false).unwrap();
+    let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, msg_type).unwrap();
     let tx_message_copy = tx_message.clone();
 
     // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
@@ -196,6 +198,7 @@ fn test_transmit() {
             Ok(&[0u8; 10])
         })
         .in_sequence(&mut seq);
+
     // transfer payload
     mocks
         .bus
@@ -204,6 +207,108 @@ fn test_transmit() {
         .returning(move |data| {
             assert_eq!(payload, data);
             Ok(&[0u8; 8])
+        })
+        .in_sequence(&mut seq);
+
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // mock setting of bits txreq and uinc
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x20, 0x69, 0x03], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // mock reading of fifo control register
+    // 1st attempt -> txreq still set ->not all messages inside tx fifo have been transmitted
+    mocks.mock_register_read::<0x02>([0x30, 0x69], &mut seq);
+    // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
+    mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
+
+    let result = mocks.into_controller().transmit(&tx_message_copy);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_transmit_can_fd() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    let payload = [1u8; 64];
+    let payload_bytes = Bytes::copy_from_slice(&payload);
+
+    let msg_type = CanFd { bitrate_switch: false };
+
+    let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
+    let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, msg_type).unwrap();
+    let tx_message_copy = tx_message.clone();
+
+    // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
+    mocks.mock_register_read::<0b0000_0000>([0x30, 0x6C], &mut seq);
+
+    // mock fifo status register read byte 0 (2nd attempt) -> tx fifo not full
+    mocks.mock_register_read::<0b0000_0001>([0x30, 0x6C], &mut seq);
+
+    // mock read operation status
+    mocks.mock_register_read::<0b0000_0000>([0x30, 0x2], &mut seq);
+
+    // mock fifo user address register read (reading 32 bits) --> address = 0x4A2
+    mocks.mock_read32::<0x00_00_04_A2>([0x30, 0x70], &mut seq);
+
+    // mock writing message in RAM specified by fifo user address (0x4A2)
+    // transfer cmd+tx_header
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            let mut cmd_and_header_buffer = [0u8; 10];
+            cmd_and_header_buffer[0] = 0x24;
+            cmd_and_header_buffer[1] = 0xA2;
+            cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
+
+            assert_eq!(cmd_and_header_buffer, data);
+            Ok(&[0u8; 10])
+        })
+        .in_sequence(&mut seq);
+
+    // transfer payload
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!(payload, data);
+            Ok(&[1u8; 64])
         })
         .in_sequence(&mut seq);
 
