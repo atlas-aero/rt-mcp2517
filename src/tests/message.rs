@@ -14,7 +14,7 @@ fn test_extended_id() {
 
     let msg_type = Can20 {};
 
-    let message = TxMessage::new(Id::Extended(extended_id), payload_bytes, msg_type).unwrap();
+    let message = TxMessage::new(msg_type, payload_bytes, Id::Extended(extended_id)).unwrap();
 
     assert!(message.header.identifier_extension_flag());
     assert_eq!(message.header.extended_identifier(), 0b01_0010_1010_0010_1011);
@@ -28,7 +28,7 @@ fn test_standard_id() {
 
     let msg_type = Can20 {};
 
-    let message = TxMessage::new(Id::Standard(standard_id), payload_bytes, msg_type).unwrap();
+    let message = TxMessage::new(msg_type, payload_bytes, Id::Standard(standard_id)).unwrap();
 
     assert!(!message.header.identifier_extension_flag());
     assert_eq!(message.header.extended_identifier(), 0b00_0000_0000_0000_0000);
@@ -42,7 +42,7 @@ fn test_dlc_success() {
 
     let msg_type = CanFd { bitrate_switch: false };
 
-    let message = TxMessage::new(Id::Standard(standard_id), payload_bytes, msg_type).unwrap();
+    let message = TxMessage::new(msg_type, payload_bytes, Id::Standard(standard_id)).unwrap();
 
     assert_eq!(message.header.data_length_code(), DLC::Sixteen);
     assert!(message.header.fd_frame());
@@ -65,8 +65,8 @@ fn test_dlc_error() {
 
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let message_2_0 = TxMessage::new(Id::Standard(standard_id), payload_bytes_2_0, can_msg_20);
-    let message_fd = TxMessage::new(Id::Standard(standard_id), payload_bytes_fd, can_msg_fd);
+    let message_2_0 = TxMessage::new(can_msg_20, payload_bytes_2_0, Id::Standard(standard_id));
+    let message_fd = TxMessage::new(can_msg_fd, payload_bytes_fd, Id::Standard(standard_id));
 
     assert_eq!(message_2_0.unwrap_err(), DLCError::InvalidLength(10));
     assert_eq!(message_fd.unwrap_err(), DLCError::InvalidLength(65));

@@ -159,7 +159,7 @@ fn test_transmit_can20() {
     let msg_type = Can20 {};
 
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
-    let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, msg_type).unwrap();
+    let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
     let tx_message_copy = tx_message.clone();
 
     // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
@@ -262,7 +262,7 @@ fn test_transmit_can_fd() {
     let msg_type = CanFd { bitrate_switch: false };
 
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
-    let tx_message = TxMessage::new(Id::Extended(identifier), payload_bytes, msg_type).unwrap();
+    let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
     let tx_message_copy = tx_message.clone();
 
     // mock fifo status register read byte 0 (1st attempt) -> tx fifo full

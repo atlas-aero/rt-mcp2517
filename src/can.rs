@@ -4,7 +4,6 @@ use crate::config::{ClockConfiguration, Configuration};
 use crate::message::{MessageType, TxMessage};
 use crate::registers::{FifoControlReg1, FifoStatusReg0};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
-use bytes::BytesMut;
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;

@@ -137,7 +137,7 @@ pub struct TxMessage<T, const MAX_LENGTH: usize> {
 }
 
 impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGTH> {
-    pub fn new(identifier: Id, data: Bytes, message_type: T) -> Result<Self, DLCError> {
+    pub fn new(message_type: T, data: Bytes, identifier: Id) -> Result<Self, DLCError> {
         let mut header = TxHeader::new();
 
         let mut payload_length = data.len();
