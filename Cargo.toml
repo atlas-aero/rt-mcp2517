@@ -2,7 +2,7 @@
 name = "mcp2517"
 description = "Library for MCP2517 CAN controller"
 keywords = ["MCP2517", "no_std", "CAN"]
-categories  = ["embedded", "hardware-support", "no-std", "network-programming"]
+categories = ["embedded", "hardware-support", "no-std", "network-programming"]
 authors = ["AtlasAero GmbH <info@atlasaero.eu>"]
 license = "MIT OR Apache-2.0"
 version = "0.0.1"
@@ -12,9 +12,14 @@ readme = "README.md"
 documentation = "https://docs.rs/mcp2517"
 
 [dependencies]
+bytes = "1.6.0"
+embedded-can = "0.4.1"
 embedded-hal = { version = "0.2.7", features = ["unproven"] }
 embedded-time = "0.12.1"
 log = "0.4.17"
+modular-bitfield-msb = "0.11.2"
+serde = { version = "1.0.197", features = ["derive"] }
+
 
 [dev-dependencies]
 mockall = "0.11.0"
