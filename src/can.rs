@@ -343,10 +343,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        let res = self.bus.transfer(&mut data).map_err(TransferError)?;
+        self.bus.transfer(&mut data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
-        Ok(res)
+        Ok(())
     }
 
     /// Read message from RX FIFO
@@ -359,10 +359,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(data).map_err(TransferError)?;
+        let res = self.bus.transfer(data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
-        Ok(data)
+        Ok(res)
     }
 
     /// 4-byte SFR read
