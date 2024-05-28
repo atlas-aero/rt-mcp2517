@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![allow(dead_code)]
+#![allow(clippy::identity_op)]
 
 extern crate alloc;
 
@@ -11,6 +12,6 @@ pub mod filter;
 pub mod message;
 #[cfg(test)]
 pub(crate) mod mocks;
-pub mod registers;
+mod registers;
 #[cfg(test)]
 mod tests;
