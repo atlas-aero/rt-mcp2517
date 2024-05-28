@@ -418,8 +418,9 @@ fn test_receive() {
         .bus
         .expect_transfer()
         .times(1)
-        .returning(move |data| {
+        .returning(|data| {
             assert_eq!([0u8; 16], data);
+            data.copy_from_slice(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8]);
             Ok(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8])
         })
         .in_sequence(&mut seq);
@@ -453,10 +454,12 @@ fn test_receive() {
         .return_const(Ok(()))
         .in_sequence(&mut seq);
 
-    let result = mocks.into_controller().receive(&mut message_buff).unwrap();
+    let result = mocks.into_controller().receive(&mut message_buff);
 
-    assert_eq!(result[..8], message_header.into_bytes());
-    assert_eq!(result[8..], [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert!(result.is_ok());
+
+    assert_eq!(message_buff[..8], message_header.into_bytes());
+    assert_eq!(message_buff[8..], [1, 2, 3, 4, 5, 6, 7, 8]);
 }
 
 #[test]
@@ -525,6 +528,7 @@ fn test_set_filter_object_standard_id() {
 
     assert!(result.is_ok());
 }
+
 #[test]
 fn test_set_filter_object_extended_id() {
     let id_extended = ExtendedId::new(EXTENDED_ID).unwrap();

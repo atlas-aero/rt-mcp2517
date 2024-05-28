@@ -107,28 +107,41 @@ pub struct FifoStatusReg0 {
     /// Transmit/Receive FIFO Not Full/Not Empty Interrupt Flag bit
     pub tfnrfnif: bool,
 }
-/// filter mask
+
+/// Filter mask register
 #[bitfield]
 #[derive(Default, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub struct FilterMaskReg {
     #[skip]
     __: B1,
+    /// Identifier Receive mode bit,
+    /// if 1, match either standard or extended (corresponding to EXIDE bit in filter),
+    /// if 0 match either
     pub mide: bool,
+    /// Standard ID Mask bit
     pub msid11: bool,
+    /// Extended ID Mask bits
     pub meid: B18,
+    /// Standard ID Mask bits
     pub msid: B11,
 }
 
-/// filter object
+/// Filter object register
 #[bitfield]
 #[derive(Default, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub struct FilterObjectReg {
     #[skip]
     __: B1,
+    /// Extended ID enable bit
+    /// If MIDE 1, setting this bit matches Extended ID only
+    /// if MIDE 1, clearing this bit matches Standard ID only
     pub exide: bool,
+    /// Standard ID filter bit
     pub sid11: bool,
+    /// Extended ID filter bits
     pub eid: B18,
+    /// Standard ID filter rbits
     pub sid: B11,
 }
