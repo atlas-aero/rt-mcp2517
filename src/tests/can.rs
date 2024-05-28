@@ -4,13 +4,13 @@ use crate::config::{
     RetransmissionAttempts, SystemClockDivisor,
 };
 use crate::filter::Filter;
-use crate::message::{Can20, CanFd, TxMessage,RxHeader};
+use crate::message::{Can20, CanFd, RxHeader, TxMessage};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
 use bytes::Bytes;
-use mockall::Sequence;
 use embedded_can::{ExtendedId, Id, StandardId};
+use mockall::Sequence;
 
 #[test]
 fn test_configure_correct() {
@@ -382,38 +382,76 @@ fn test_receive() {
 
     let id = ExtendedId::new(EXTENDED_ID).unwrap();
 
+    let mut seq = Sequence::new();
+
     // custom Rx message header for testing
     let message_header = RxHeader::new_test_cfg(Id::Extended(id));
 
     let mut message_buff = [0u8; 16];
 
     // status register read
-    mocks.mock_register_read::<0b0000_0001>([0x30, 0x60]);
+    mocks.mock_register_read::<0b0000_0001>([0x30, 0x60], &mut seq);
 
     // user address register read
-    mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64]);
+    mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64], &mut seq);
 
     // Message read from RAM address 0x47C
-    //transfer cmd+address
-    mocks.bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0x34, 0x7C], data);
-        Ok(&[0u8; 2])
-    });
+    // transfer cmd+address
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x34, 0x7C], data);
+            Ok(&[0u8; 2])
+        })
+        .in_sequence(&mut seq);
 
     // transfer message_buff where message bytes are placed
-    mocks.bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0u8; 16], data);
-        Ok(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8])
-    });
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0u8; 16], data);
+            Ok(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
 
     // set uinc bit in Rx FIFO control register
-    mocks.bus.expect_transfer().times(1).returning(move |data| {
-        assert_eq!([0x20, 0x5D, 0b0000_0001], data);
-        Ok(&[0u8; 3])
-    });
-
-    mocks.pin_cs.expect_set_low().times(2).return_const(Ok(()));
-    mocks.pin_cs.expect_set_high().times(2).return_const(Ok(()));
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x20, 0x5D, 0b0000_0001], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
 
     let result = mocks.into_controller().receive(&mut message_buff).unwrap();
 

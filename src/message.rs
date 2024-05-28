@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use embedded_can::Id;
+use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;
 use modular_bitfield_msb::prelude::*;
 
@@ -181,19 +181,29 @@ pub struct RxHeader {
     // R0
     #[skip]
     __: B2,
+    /// In FD mode the standard ID can be extended to 12 bit using r1
     sid11: bool,
+    /// Extended Identifier
     extended_identifier: B18,
+    /// Standard Identifier
     standard_identifier: B11,
     #[skip]
     __: B16,
+    /// Filter Hit, number of filter that matched
     filter_hit: B5,
     #[skip]
     __: B2,
+    /// Error Status Indicator
     error_status_indicator: bool,
+    /// FD Frame; distinguishes between CAN and CAN FD formats
     fd_frame: bool,
+    /// Bit Rate Switch; indicates if data bit rate was switched
     bit_rate_switch: bool,
+    /// Remote Transmission Request; not used in CAN FD
     remote_transmission_request: bool,
+    /// Identifier Extension Flag; distinguishes between base and extended format
     identifier_extension_flag: bool,
+    /// Data Length Code
     data_length_code: DLC,
 }
 
@@ -208,6 +218,7 @@ impl RxHeader {
             Id::Standard(id.unwrap())
         }
     }
+
     #[cfg(test)]
     pub fn new_test_cfg(identifier: Id) -> Self {
         match identifier {

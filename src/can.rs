@@ -298,12 +298,14 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
     /// Receive CAN Message
     pub fn receive<'a>(&mut self, data: &'a mut [u8]) -> Result<&'a [u8], Error<B::Error, CS::Error>> {
-        let mut rxfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_RX_INDEX))?;
+        let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
+
+        let mut rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
         let mut rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
 
-        // block until fifo contains at least one message
+        // block until fifo rx contains at least one message
         while !rxfifo_status_reg0.tfnrfnif() {
-            rxfifo_status_byte0 = self.read_register(Self::fifo_status_register(FIFO_RX_INDEX))?;
+            rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
             rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
         }
 
@@ -341,10 +343,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(&mut data).map_err(TransferError)?;
+        let res = self.bus.transfer(&mut data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
-        Ok(())
+        Ok(res)
     }
 
     /// Read message from RX FIFO
@@ -357,9 +359,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        let res = self.bus.transfer(data).map_err(TransferError)?;
+        self.bus.transfer(data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
-        Ok(res)
+
+        Ok(data)
     }
 
     /// 4-byte SFR read
