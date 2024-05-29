@@ -375,14 +375,15 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         buffer[1] = (command & 0xFF) as u8;
 
         self.pin_cs.set_low().map_err(CSError)?;
-        let result = self.bus.transfer(&mut buffer).map_err(TransferError)?;
+        self.bus.transfer(&mut buffer).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
 
-        let mut data_read = [0u8; 4];
-        data_read.clone_from_slice(&result[2..]);
+        let slice = &buffer[2..];
 
-        // reverse so that msb byte of register is at the first index
-        let result = u32::from_le_bytes(data_read);
+        // SFR addresses are at the LSB of the registers
+        // so last read byte is the MSB of the register
+        // and since bitfield_msb is used, order of bytes is reversed
+        let result = u32::from_le_bytes(slice.try_into().expect("wrong slice length"));
 
         Ok(result)
     }

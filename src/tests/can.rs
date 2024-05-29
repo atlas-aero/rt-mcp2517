@@ -749,14 +749,15 @@ impl Mocks {
             .times(1)
             .returning(move |data| {
                 assert_eq!(expected_buffer, data);
-                Ok(&[
+                data.copy_from_slice(&[
                     0x0,
                     0x0,
                     REG as u8,
                     (REG >> 8) as u8,
                     (REG >> 16) as u8,
                     (REG >> 24) as u8,
-                ])
+                ]);
+                Ok(&[0u8; 6])
             })
             .in_sequence(seq);
 
