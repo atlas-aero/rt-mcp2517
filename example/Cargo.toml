@@ -23,4 +23,4 @@ rp-pico = "0.9.0"
 rp2040-boot2 = "0.3.0"
 
 [patch.crates-io]
-bytes = { git = "ssh://git@github.com/pegasus-aero/rt-bytes.git", branch = "cfg_target_has_atomic_v1.1.0" }
+bytes = { git = "https://github.com/atlas-aero/rt-bytes.git", branch = "cfg_target_has_atomic_v1.1.0" }

@@ -110,7 +110,34 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} --features ${{ matrix.feature }},strict
 
+  example_build:
+    name: Build example crate
+    runs-on: ubuntu-latest
+    matrix:
+      target:
+        - thumbv6m-none-eabi
+      rust:
+        - stable
+        - beta
+        - nightly
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
 
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+          default: true
+          profile: minimal
+
+      - name: Restore cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} --manifest-path example/Cargo.toml
+  
   code_style:
     name: Check code style
     runs-on: ubuntu-latest
