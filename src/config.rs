@@ -148,8 +148,24 @@ pub struct FifoConfiguration {
     /// Value is limited to 32 messages if a higher value is given.
     pub tx_size: u8,
 
+    /// Number of payload bytes in message
+    pub pl_size: PayloadSize,
+
     /// Enables/Disables TX FIFO
     pub tx_enable: bool,
+}
+
+/// Permitted sizes of the message payload for a FIFO
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PayloadSize {
+    EightBytes = 0b000,
+    TwelveBytes = 0b001,
+    SixteenBytes = 0b010,
+    TwentyBytes = 0b011,
+    TwentyFourBytes = 0b100,
+    ThirtyTwoBytes = 0b101,
+    FortyEightBytes = 0b110,
+    SixtyFourBytes = 0b111,
 }
 
 impl Default for FifoConfiguration {
@@ -159,6 +175,7 @@ impl Default for FifoConfiguration {
             tx_attempts: RetransmissionAttempts::default(),
             tx_priority: 0,
             tx_size: 32,
+            pl_size: PayloadSize::EightBytes,
             tx_enable: true,
         }
     }
@@ -167,7 +184,7 @@ impl Default for FifoConfiguration {
 impl FifoConfiguration {
     /// Encodes the configuration to RX FIFO configuration register byte
     pub(crate) fn as_rx_register(&self) -> u8 {
-        Self::limit_size(self.rx_size) - 1
+        (Self::limit_size(self.rx_size) - 1) | ((self.pl_size as u8) << 5)
     }
 
     /// Encodes the configuration for the first TX configuration register byte
@@ -185,12 +202,12 @@ impl FifoConfiguration {
 
     /// Encodes the configuration for the fourth TX configuration register byte
     pub(crate) fn as_tx_register_3(&self) -> u8 {
-        Self::limit_size(self.tx_size) - 1
+        (Self::limit_size(self.tx_size) - 1) | ((self.pl_size as u8) << 5)
     }
 
     /// Limits the size to valid values
     fn limit_size(size: u8) -> u8 {
-        size.max(1).min(32)
+        size.clamp(1, 32)
     }
 }
 
