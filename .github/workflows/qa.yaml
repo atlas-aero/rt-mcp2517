@@ -113,13 +113,14 @@ jobs:
   example_build:
     name: Build example crate
     runs-on: ubuntu-latest
-    matrix:
-      target:
-        - thumbv6m-none-eabi
-      rust:
-        - stable
-        - beta
-        - nightly
+    strategy:
+      matrix:
+        target:
+          - thumbv6m-none-eabi
+        rust:
+          - stable
+          - beta
+          - nightly
     steps:
       - name: checkout
         uses: actions/checkout@v4
