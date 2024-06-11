@@ -697,6 +697,86 @@ fn test_read_clock_configuration_transfer_error() {
     );
 }
 
+#[test]
+fn test_filter_enable() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+
+    // Disable filter 2
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x21, 0xD2, 0x00], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // write the fifo index where the message that matches the filter is stored
+    // Fifo rx index is 1 in our case
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x21, 0xD2, 0x01], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // Set FLTENm to enable filter
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x21, 0xD2, 0x81], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    let result = mocks.into_controller().enable_filter(1, 2);
+
+    assert!(result.is_ok());
+}
+
 #[derive(Default)]
 pub(crate) struct Mocks {
     pub(crate) bus: MockSPIBus,
