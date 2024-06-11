@@ -197,7 +197,6 @@ fn test_transmit_can20() {
 
     // mock writing message in RAM specified by fifo user address (0x4A2)
     // transfer cmd+tx_header
-
     mocks
         .pin_cs
         .expect_set_low()
@@ -388,7 +387,10 @@ fn test_receive() {
 
     let mut message_buff = [0u8; 16];
 
-    // status register read
+    // status register read (wait till fifo not empty flag is set)
+    mocks.mock_register_read::<0b0000_0000>([0x30, 0x60], &mut seq);
+
+    // status register read (fifo not empty flag is set)
     mocks.mock_register_read::<0b0000_0001>([0x30, 0x60], &mut seq);
 
     // user address register read
@@ -773,6 +775,41 @@ fn test_filter_enable() {
         .in_sequence(&mut seq);
 
     let result = mocks.into_controller().enable_filter(1, 2);
+
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_filter_disable() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+
+    // Disable filter 6
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            // byte0+byte1 -> cmd+addr
+            // byte2 -> byte value written
+            assert_eq!([0x21, 0xD6, 0x00], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    let result = mocks.into_controller().disable_filter(6);
 
     assert!(result.is_ok());
 }
