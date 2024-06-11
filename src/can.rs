@@ -313,7 +313,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         // read message object
         self.read_fifo(address as u16, data)?;
 
-        // set uinc
+        // set UINC bit for incrementing the FIFO head by a single message
         self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
 
         Ok(())
@@ -443,6 +443,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     fn filter_control_register_byte(filter_index: u8) -> u16 {
         0x1D0 + filter_index as u16
     }
+
     /// returns the filter object register address of corresponding filter
     fn filter_object_register(filter_index: u8) -> u16 {
         0x1F0 + 8 * (filter_index as u16)
