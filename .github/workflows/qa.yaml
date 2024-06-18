@@ -47,7 +47,36 @@ jobs:
       - name: Build default features
         run: cargo build --release --features strict
 
-  example_build:
+  build:
+    name: Build for no_std thumbv7m target
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - thumbv7m-none-eabi
+        rust:
+          - stable
+          - beta
+          - nightly
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+          default: true
+          profile: minimal
+
+      - name: Restore cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} --features default,strict
+
+  example_crate_build:
     name: Build example crate for no_std thumbv6m
     runs-on: ubuntu-latest
     strategy:
