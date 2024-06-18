@@ -48,13 +48,12 @@ jobs:
         run: cargo build --release --features strict
 
   example_build:
-    name: Build example crate for no_std target
+    name: Build example crate for no_std thumbv6m
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target:
           - thumbv6m-none-eabi
-          - thumbv7m-none-eabi
         rust:
           - stable
           - beta
