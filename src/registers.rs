@@ -1,3 +1,4 @@
+#![allow(unused_braces)]
 use modular_bitfield_msb::prelude::*;
 
 #[bitfield]
