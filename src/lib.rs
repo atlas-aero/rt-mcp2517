@@ -9,6 +9,7 @@ pub mod can;
 pub mod config;
 pub mod status;
 
+pub mod filter;
 pub mod message;
 #[cfg(test)]
 pub(crate) mod mocks;

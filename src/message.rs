@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use embedded_can::Id;
+use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;
 use modular_bitfield_msb::prelude::*;
 
@@ -170,5 +170,66 @@ impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGT
             buff: data,
             message_type,
         })
+    }
+}
+
+/// Receive message object header
+#[bitfield(bits = 64)]
+#[derive(Default, PartialEq, Eq, Debug)]
+#[repr(u64)]
+pub struct RxHeader {
+    // R0
+    #[skip]
+    __: B2,
+    /// In FD mode the standard ID can be extended to 12 bit using r1
+    sid11: bool,
+    /// Extended Identifier
+    extended_identifier: B18,
+    /// Standard Identifier
+    standard_identifier: B11,
+    #[skip]
+    __: B16,
+    /// Filter Hit, number of filter that matched
+    filter_hit: B5,
+    #[skip]
+    __: B2,
+    /// Error Status Indicator
+    error_status_indicator: bool,
+    /// FD Frame; distinguishes between CAN and CAN FD formats
+    fd_frame: bool,
+    /// Bit Rate Switch; indicates if data bit rate was switched
+    bit_rate_switch: bool,
+    /// Remote Transmission Request; not used in CAN FD
+    remote_transmission_request: bool,
+    /// Identifier Extension Flag; distinguishes between base and extended format
+    identifier_extension_flag: bool,
+    /// Data Length Code
+    data_length_code: DLC,
+}
+
+impl RxHeader {
+    fn get_id(&self) -> Id {
+        if self.identifier_extension_flag() {
+            let id = ((self.standard_identifier() as u32) << 18) | (self.extended_identifier());
+            let extended_id = ExtendedId::new(id);
+            Id::Extended(extended_id.unwrap())
+        } else {
+            let id = StandardId::new(self.standard_identifier());
+            Id::Standard(id.unwrap())
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_test_cfg(identifier: Id) -> Self {
+        match identifier {
+            Id::Extended(eid) => Self::new()
+                .with_data_length_code(DLC::Eight)
+                .with_standard_identifier((eid.as_raw() >> 18) as u16 & STANDARD_IDENTIFIER_MASK)
+                .with_extended_identifier(eid.as_raw() & EXTENDED_IDENTIFIER_MASK)
+                .with_identifier_extension_flag(true),
+            Id::Standard(sid) => Self::new()
+                .with_data_length_code(DLC::Eight)
+                .with_standard_identifier(sid.as_raw()),
+        }
     }
 }
