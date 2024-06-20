@@ -12,14 +12,18 @@ readme = "README.md"
 documentation = "https://docs.rs/mcp2517"
 
 [dependencies]
-bytes = "1.6.0"
+bytes = { version = "1.6.0", default-features = false }
 embedded-can = "0.4.1"
 embedded-hal = { version = "0.2.7", features = ["unproven"] }
 embedded-time = "0.12.1"
 log = "0.4.17"
 modular-bitfield-msb = "0.11.2"
-serde = { version = "1.0.197", features = ["derive"] }
+serde = { version = "1.0.197", features = ["derive"], default-features = false }
 
 
 [dev-dependencies]
 mockall = "0.11.0"
+
+[features]
+default = []
+strict = []
