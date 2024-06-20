@@ -268,8 +268,7 @@ fn test_transmit_can20() {
     // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
-    let result = mocks.into_controller().transmit(&tx_message_copy);
-    assert!(result.is_ok());
+    mocks.into_controller().transmit(&tx_message_copy).unwrap();
 }
 
 #[test]
@@ -370,8 +369,7 @@ fn test_transmit_can_fd() {
     // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
-    let result = mocks.into_controller().transmit(&tx_message_copy);
-    assert!(result.is_ok());
+    mocks.into_controller().transmit(&tx_message_copy).unwrap();
 }
 
 #[test]
@@ -487,8 +485,7 @@ fn test_reset_command() {
         .return_const(Ok(()))
         .in_sequence(&mut seq);
 
-    let result = mocks.into_controller().reset();
-    assert!(result.is_ok());
+    mocks.into_controller().reset().unwrap();
 }
 
 #[test]
