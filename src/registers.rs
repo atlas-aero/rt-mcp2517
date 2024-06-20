@@ -1,9 +1,10 @@
+#![allow(unused_braces)]
 use modular_bitfield_msb::prelude::*;
 
-/// Fourth byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
+/// Fourth byte of FIFO Control register
 pub struct FifoControlReg3 {
     pub plsize: B3,
     fsize: B5,
@@ -23,10 +24,10 @@ impl FifoControlReg3 {
     }
 }
 
-/// Third byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
+/// Third byte of FIFO Control register
 pub struct FifoControlReg2 {
     #[skip]
     __: B1,
@@ -36,10 +37,10 @@ pub struct FifoControlReg2 {
     pub txpri: B5,
 }
 
-/// Second byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
+/// Second byte of FIFO Control register
 pub struct FifoControlReg1 {
     #[skip]
     __: B5,
@@ -51,10 +52,10 @@ pub struct FifoControlReg1 {
     pub uinc: bool,
 }
 
-/// First byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
+/// First byte of FIFO Control register
 pub struct FifoControlReg0 {
     /// TX/RX FIFO Selection bit
     pub txen: bool,
@@ -74,10 +75,10 @@ pub struct FifoControlReg0 {
     pub tfnrfnie: bool,
 }
 
-/// Second byte of FIFO Status register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
+/// Second byte of FIFO Status register
 pub struct FifoStatusReg1 {
     #[skip]
     __: B3,
@@ -85,10 +86,10 @@ pub struct FifoStatusReg1 {
     pub fifoci: B5,
 }
 
-/// First byte of FIFO Status register
 #[bitfield]
 #[derive(Default)]
 #[repr(u8)]
+/// First byte of FIFO Status register
 pub struct FifoStatusReg0 {
     /// Message Aborted Status bit
     pub txabt: bool,

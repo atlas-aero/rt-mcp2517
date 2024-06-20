@@ -1,0 +1,26 @@
+[package]
+name = "rt-mcp2517-example-rp-pico"
+description = "Example/Test crate for testing thumbv6"
+authors = ["AtlasAero GmbH <info@atlasaero.eu>", "Neomium GmbH <info@neomium.eu>"]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mcp2517 = { path = "..", version = "*" }
+
+# Embedded crates
+embedded-hal = "1.0.0"
+embedded-time = "0.12.1"
+embedded-alloc = "0.5.1"
+critical-section = "1.1.2"
+panic-halt = "0.2.0"
+
+# Hardware support crates
+rp2040-hal = "0.10.1"
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.3"
+rp-pico = "0.9.0"
+rp2040-boot2 = "0.3.0"
+
+[patch.crates-io]
+bytes = { git = "https://github.com/atlas-aero/rt-bytes.git", branch = "cfg_target_has_atomic_v1.6.0" }
