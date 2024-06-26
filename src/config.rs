@@ -234,6 +234,8 @@ pub enum RequestMode {
     InternalLoopback,
     /// External loop back mode
     ExternalLoopback,
+    /// Listen only mode
+    ListenOnly,
     /// CAN 2.0 mode, possible error frames on CAN FD frames
     NormalCAN2_0,
 }
@@ -250,6 +252,7 @@ impl RequestMode {
             RequestMode::NormalCANFD => OperationMode::NormalCANFD,
             RequestMode::InternalLoopback => OperationMode::InternalLoopback,
             RequestMode::ExternalLoopback => OperationMode::ExternalLoopback,
+            RequestMode::ListenOnly => OperationMode::ListenOnly,
             RequestMode::NormalCAN2_0 => OperationMode::NormalCAN2_0,
         }
     }
