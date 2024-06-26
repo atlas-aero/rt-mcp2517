@@ -112,7 +112,7 @@ fn main() -> ! {
     // Create message frame
     let message_type = Can20 {};
     let payload = [1, 2, 3, 4, 5, 6, 7, 8];
-    let pl_bytes = bytes::Bytes::copy_from_slice(&payload);
+    let pl_bytes = Bytes::copy_from_slice(&payload);
     let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
 
     let mut receive_buffer = [0u8; 8];
