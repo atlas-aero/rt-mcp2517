@@ -7,10 +7,21 @@ pub mod mutex;
 
 use crate::clock::SystemClock;
 use crate::heap::Heap;
+use bytes::Bytes;
+use cortex_m::asm::delay;
+use embedded_can::{Id, StandardId};
+use embedded_hal::delay::DelayNs;
 use hal::clocks::Clock;
 use hal::fugit::RateExtU32;
 use hal::pac;
+use log::info;
 use mcp2517::can::Controller;
+use mcp2517::config::{
+    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
+    RetransmissionAttempts, SystemClockDivisor,
+};
+use mcp2517::filter::Filter;
+use mcp2517::message::{Can20, TxMessage};
 use panic_halt as _;
 use rp2040_hal as hal;
 
@@ -56,10 +67,65 @@ fn main() -> ! {
         embedded_hal::spi::MODE_0,
     );
 
+    let mut timer = hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+    let sys_clk = SystemClock::default();
+    sys_clk.initialize(timer);
+
     // Configure GPIO5 as an CS pin
     let pin_cs = pins.gpio5.into_push_pull_output();
 
-    let _controller: Controller<_, _, SystemClock> = Controller::new(spi, pin_cs);
+    let mut can_controller: Controller<_, _, SystemClock> = Controller::new(spi, pin_cs);
 
-    loop {}
+    // Setup clk config
+    let clk_config = ClockConfiguration {
+        clock_output: ClockOutputDivisor::DivideBy1,
+        system_clock: SystemClockDivisor::DivideBy1,
+        pll: PLLSetting::DirectXTALOscillator,
+        disable_clock: false,
+    };
+
+    // Setup fifo config
+    let fifo_config = FifoConfiguration {
+        rx_size: 1,
+        tx_size: 1,
+        pl_size: PayloadSize::EightBytes,
+        tx_priority: 32,
+        tx_enable: true,
+        tx_attempts: RetransmissionAttempts::Unlimited,
+    };
+
+    // Setup CAN Controller config
+    let config = Configuration {
+        clock: clk_config,
+        fifo: fifo_config,
+        mode: RequestMode::InternalLoopback,
+    };
+
+    let _ = can_controller.configure(&config, &sys_clk);
+
+    let can_id = Id::Standard(StandardId::new(0x55).unwrap());
+
+    // Create filter object for RX
+    let filter = Filter::new(can_id, 0).unwrap();
+    let _ = can_controller.set_filter_object(filter);
+
+    // Create message frame
+    let message_type = Can20 {};
+    let payload = [1, 2, 3, 4, 5, 6, 7, 8];
+    let pl_bytes = bytes::Bytes::copy_from_slice(&payload);
+    let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
+
+    let mut receive_buffer = [0u8; 8];
+
+    loop {
+        can_controller.transmit(&can_message).unwrap();
+        info!("Message sent");
+
+        match can_controller.receive(&mut receive_buffer).unwrap() {
+            Ok(_) => info!("message received {receive_buffer:?}"),
+            Err(e) => info!("Error while attempting to read message: {e:?}"),
+        }
+
+        timer.delay_ms(500);
+    }
 }
