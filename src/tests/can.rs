@@ -3,10 +3,11 @@ use crate::config::{
     ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
     RetransmissionAttempts, SystemClockDivisor,
 };
-use crate::message::{Can20, CanFd, RxHeader, TxMessage};
+use crate::message::{Can20, CanFd, TxMessage};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id};
 use mockall::Sequence;
@@ -210,9 +211,15 @@ fn test_transmit_can20() {
         .times(1)
         .returning(move |data| {
             let mut cmd_and_header_buffer = [0u8; 10];
-            cmd_and_header_buffer[0] = 0x24;
+            cmd_and_header_buffer[0] = 0x28;
             cmd_and_header_buffer[1] = 0xA2;
+
             cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
+
+            for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+                let num = BigEndian::read_u32(chunk);
+                LittleEndian::write_u32(chunk, num);
+            }
 
             assert_eq!(cmd_and_header_buffer, data);
             Ok(&[0u8; 10])
@@ -311,9 +318,14 @@ fn test_transmit_can_fd() {
         .times(1)
         .returning(move |data| {
             let mut cmd_and_header_buffer = [0u8; 10];
-            cmd_and_header_buffer[0] = 0x24;
+            cmd_and_header_buffer[0] = 0x28;
             cmd_and_header_buffer[1] = 0xA2;
             cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
+
+            for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+                let num = BigEndian::read_u32(chunk);
+                LittleEndian::write_u32(chunk, num);
+            }
 
             assert_eq!(cmd_and_header_buffer, data);
             Ok(&[0u8; 10])
@@ -376,14 +388,9 @@ fn test_transmit_can_fd() {
 fn test_receive() {
     let mut mocks = Mocks::default();
 
-    let id = ExtendedId::new(EXTENDED_ID).unwrap();
-
     let mut seq = Sequence::new();
 
-    // custom Rx message header for testing
-    let message_header = RxHeader::new_test_cfg(Id::Extended(id));
-
-    let mut message_buff = [0u8; 16];
+    let mut message_buff = [0u8; 8];
 
     // status register read (wait till fifo not empty flag is set)
     mocks.mock_register_read::<0b0000_0000>([0x30, 0x60], &mut seq);
@@ -394,7 +401,7 @@ fn test_receive() {
     // user address register read
     mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64], &mut seq);
 
-    // Message read from RAM address 0x47C
+    // Message read from RAM address (0x47C+8) to start reading received message object payload
     // transfer cmd+address
     mocks
         .pin_cs
@@ -407,7 +414,7 @@ fn test_receive() {
         .expect_transfer()
         .times(1)
         .returning(move |data| {
-            assert_eq!([0x34, 0x7C], data);
+            assert_eq!([0x38, 0x84], data);
             Ok(&[0u8; 2])
         })
         .in_sequence(&mut seq);
@@ -418,9 +425,9 @@ fn test_receive() {
         .expect_transfer()
         .times(1)
         .returning(|data| {
-            assert_eq!([0u8; 16], data);
-            data.copy_from_slice(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8]);
-            Ok(&[0x09, 0x51, 0x5D, 0x32, 0u8, 0u8, 0u8, 0x18, 1, 2, 3, 4, 5, 6, 7, 8])
+            assert_eq!([0u8; 8], data);
+            data.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+            Ok(&[1, 2, 3, 4, 5, 6, 7, 8])
         })
         .in_sequence(&mut seq);
     mocks
@@ -457,8 +464,7 @@ fn test_receive() {
 
     assert!(result.is_ok());
 
-    assert_eq!(message_buff[..8], message_header.into_bytes());
-    assert_eq!(message_buff[8..], [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(message_buff, [1, 2, 3, 4, 5, 6, 7, 8]);
 }
 
 #[test]

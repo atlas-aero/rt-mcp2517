@@ -137,7 +137,7 @@ pub struct FilterObjectReg {
     __: B1,
     /// Extended ID enable bit
     /// If MIDE 1, setting this bit matches Extended ID only
-    /// if MIDE 1, clearing this bit matches Standard ID only
+    /// If MIDE 0, clearing this bit matches Standard ID only
     pub exide: bool,
     /// Standard ID filter bit
     pub sid11: bool,

@@ -5,6 +5,7 @@ use crate::filter::Filter;
 use crate::message::{MessageType, TxMessage};
 use crate::registers::{FifoControlReg1, FifoStatusReg0};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use core::marker::PhantomData;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
@@ -102,7 +103,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.write_register(
             Self::fifo_control_register(FIFO_RX_INDEX) + 3,
-            config.fifo.as_rx_register(),
+            config.fifo.as_rx_register_3(),
         )?;
 
         self.write_register(
@@ -186,6 +187,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // Set FLTENm to enable filter
         self.write_register(filter_control_reg, (1 << 7) | fifo_index)?;
+
         Ok(())
     }
 
@@ -193,6 +195,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
         let filter_reg = Self::filter_control_register_byte(filter_index);
         self.write_register(filter_reg, 0x00)?;
+
         Ok(())
     }
 
@@ -207,7 +210,12 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         let mask_value = u32::from(filter.mask_bits);
 
         self.write32(filter_object_reg, filter_value)?;
+
         self.write32(filter_mask_reg, mask_value)?;
+
+        let filter_control_reg = Self::filter_control_register_byte(filter.index);
+
+        self.write_register(filter_control_reg, (1 << 7) | 1)?;
 
         Ok(())
     }
@@ -273,7 +281,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         }
 
         // get address in which to write next message in TX FIFO (should not be read in configuration mode)
-        let address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
+        let user_address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
+
+        // calculate address of next Message Object according to
+        // Equation 4-1 in MCP251XXFD Family Reference Manual
+        let address = user_address + 0x400;
 
         // get address of TX FIFO control register byte 1
         let fifo_control_reg1 = Self::fifo_control_register(FIFO_TX_INDEX) + 1;
@@ -309,7 +321,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
             rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
         }
 
-        let address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
+        let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
+
+        let address = 0x400 + user_address;
+
         // read message object
         self.read_fifo(address as u16, data)?;
 
@@ -335,11 +350,16 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // copy message data into mutable buffer
         let mut data = [0u8; L];
-        data.copy_from_slice(message.buff.as_ref());
+        data.copy_from_slice(&message.buff);
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
         buffer[2..].copy_from_slice(&message.header.into_bytes());
+
+        for word in buffer[2..].chunks_exact_mut(4) {
+            let num = BigEndian::read_u32(word);
+            LittleEndian::write_u32(word, num);
+        }
 
         self.pin_cs.set_low().map_err(CSError)?;
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
@@ -351,8 +371,9 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
     /// Read message from RX FIFO
     fn read_fifo(&mut self, register: u16, data: &mut [u8]) -> Result<(), Error<B::Error, CS::Error>> {
+        let payload_address = register + 8;
         let mut buffer = [0u8; 2];
-        let command = (register & 0x0FFF) | ((Operation::Read as u16) << 12);
+        let command = (payload_address & 0x0FFF) | ((Operation::Read as u16) << 12);
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
