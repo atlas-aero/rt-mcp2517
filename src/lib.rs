@@ -1,4 +1,5 @@
 #![cfg_attr(not(test), no_std)]
+#![cfg_attr(feature = "strict", deny(warnings))]
 #![allow(dead_code)]
 #![allow(clippy::identity_op)]
 
@@ -14,6 +15,6 @@ pub mod message;
 pub mod example;
 #[cfg(test)]
 pub(crate) mod mocks;
-pub mod registers;
+mod registers;
 #[cfg(test)]
 mod tests;

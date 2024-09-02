@@ -1,11 +1,14 @@
-use bytes::BytesMut;
+use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;
 use modular_bitfield_msb::prelude::*;
 
 pub const STANDARD_IDENTIFIER_MASK: u16 = 0x7FF;
+
 pub const EXTENDED_IDENTIFIER_MASK: u32 = 0x3FFFF;
+
 pub const MAX_PAYLOAD_CAN_2_0: usize = 8;
+
 pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
 /// Data length code
@@ -93,43 +96,60 @@ pub struct TxHeader {
     pub data_length_code: DLC,
 }
 
+/// CAN 2.0 message type
+#[derive(Debug, Copy, Clone)]
+pub struct Can20 {}
+
+impl MessageType<8> for Can20 {
+    fn setup_header(&self, _header: &mut TxHeader) -> Result<(), DLCError> {
+        Ok(())
+    }
+}
+
+/// CAN FD message type
+#[derive(Debug, Copy, Clone)]
+pub struct CanFd {
+    pub bitrate_switch: bool,
+}
+
+impl MessageType<64> for CanFd {
+    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError> {
+        header.set_bit_rate_switch(self.bitrate_switch);
+        header.set_fd_frame(true);
+        Ok(())
+    }
+}
+
+pub trait MessageType<const MAX_LENGTH: usize> {
+    /// Setup CAN message header depending on message type
+    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError>;
+}
+
 /// Transmit Message Object
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct TxMessage {
+pub struct TxMessage<T, const MAX_LENGTH: usize> {
     /// first 2 bytes of Transmit Message Object
     pub(crate) header: TxHeader,
     /// Payload bytes of Message Object
-    pub(crate) buff: BytesMut,
-    /// Size of payload bytes
-    pub(crate) length: usize,
+    pub(crate) buff: Bytes,
+    /// CAN message type (CAN 2.0 or CAN FD)
+    pub(crate) message_type: T,
 }
 
-impl TxMessage {
-    pub fn new(identifier: Id, mut data: BytesMut, can_fd: bool, bitrate_switch: bool) -> Result<Self, DLCError> {
+impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGTH> {
+    pub fn new(message_type: T, data: Bytes, identifier: Id) -> Result<Self, DLCError> {
         let mut header = TxHeader::new();
+
         let mut payload_length = data.len();
 
-        if can_fd {
-            header.set_fd_frame(true);
-
-            if data.len() > MAX_PAYLOAD_CAN_FD {
-                debug!("Maximum of 64 data bytes allowed for CANFD message. Current size: {payload_length}");
-                return Err(DLCError::InvalidLength(data.len()));
-            }
-
-            if bitrate_switch {
-                header.set_bit_rate_switch(true);
-            }
-        } else if data.len() > MAX_PAYLOAD_CAN_2_0 {
-            debug!("Maximum of 8 data bytes allowed for CAN2.0 message. Current size: {payload_length}");
-            return Err(DLCError::InvalidLength(data.len()));
+        if payload_length > MAX_LENGTH {
+            debug!("Maximum of {MAX_LENGTH} bytes allowed. Current size: {payload_length} bytes");
+            return Err(DLCError::InvalidLength(payload_length));
         }
 
-        // make sure length divisible by four (word size)
-        let length = (payload_length + 3) & !3;
+        message_type.setup_header(&mut header)?;
 
-        data.resize(length, 0);
-
+        // length used to choose the next supported DLC
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;
         }
@@ -148,7 +168,7 @@ impl TxMessage {
         Ok(TxMessage {
             header,
             buff: data,
-            length,
+            message_type,
         })
     }
 }
@@ -161,19 +181,29 @@ pub struct RxHeader {
     // R0
     #[skip]
     __: B2,
+    /// In FD mode the standard ID can be extended to 12 bit using r1
     sid11: bool,
+    /// Extended Identifier
     extended_identifier: B18,
+    /// Standard Identifier
     standard_identifier: B11,
     #[skip]
     __: B16,
+    /// Filter Hit, number of filter that matched
     filter_hit: B5,
     #[skip]
     __: B2,
+    /// Error Status Indicator
     error_status_indicator: bool,
+    /// FD Frame; distinguishes between CAN and CAN FD formats
     fd_frame: bool,
+    /// Bit Rate Switch; indicates if data bit rate was switched
     bit_rate_switch: bool,
+    /// Remote Transmission Request; not used in CAN FD
     remote_transmission_request: bool,
+    /// Identifier Extension Flag; distinguishes between base and extended format
     identifier_extension_flag: bool,
+    /// Data Length Code
     data_length_code: DLC,
 }
 
@@ -188,6 +218,7 @@ impl RxHeader {
             Id::Standard(id.unwrap())
         }
     }
+
     #[cfg(test)]
     pub fn new_test_cfg(identifier: Id) -> Self {
         match identifier {
