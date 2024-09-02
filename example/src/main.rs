@@ -12,7 +12,6 @@ use bytes::Bytes;
 use core::fmt::Write;
 use embedded_can::{Id, StandardId};
 use embedded_hal::delay::DelayNs;
-use embedded_hal::digital::OutputPin;
 use fugit::RateExtU32;
 use mcp2517::can::Controller;
 use mcp2517::config::{
@@ -74,8 +73,6 @@ fn main() -> ! {
         1.MHz(),
         embedded_hal::spi::MODE_0,
     );
-
-    let mut led_pin = pins.led.into_push_pull_output();
 
     let mut timer = Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
     let sys_clk = SystemClock::default();
@@ -146,8 +143,6 @@ fn main() -> ! {
                 for val in receive_buffer {
                     uart.write_fmt(format_args!("{val}\n\r")).unwrap();
                 }
-
-                led_pin.set_high().unwrap();
             }
             Err(e) => uart.write_fmt(format_args!("error reading message {:?}\n\r", e)).unwrap(),
         }
