@@ -78,9 +78,10 @@ fn main() -> ! {
     let sys_clk = SystemClock::default();
     sys_clk.initialize(timer);
 
-    // Configure GPIO5 as an CS pin
+    // Configure GPIO13 as an CS pin
     let pin_cs = pins.gpio13.into_push_pull_output();
 
+    // Enable uart to print to terminal
     let mut uart = bsp::hal::uart::UartPeripheral::new(
         pac.UART0,
         (pins.gpio0.into_function(), pins.gpio1.into_function()),
