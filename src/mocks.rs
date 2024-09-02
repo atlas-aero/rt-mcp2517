@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::cell::RefCell;
+use core::convert::Infallible;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_time::clock::Error;

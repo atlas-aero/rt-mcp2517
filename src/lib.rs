@@ -10,6 +10,8 @@ pub mod status;
 
 pub mod filter;
 pub mod message;
+
+pub mod example;
 #[cfg(test)]
 pub(crate) mod mocks;
 pub mod registers;

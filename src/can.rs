@@ -1,3 +1,63 @@
+//! # CAN transmission example
+//!```
+//!use mcp2517::example::{ExampleSPIBus,ExampleCSPin,ExampleClock};
+//!use mcp2517::config::*;
+//!use mcp2517::message::*;
+//!use mcp2517::can::Controller;
+//!use embedded_can::{Id,StandardId};
+//!
+//!let spi_bus = ExampleSPIBus::default();
+//!let cs_pin = ExampleCSPin{};
+//!let clock = ExampleClock::default();
+//!
+//!let mut can_controller: Controller<_, _, ExampleClock> = Controller::new(spi_bus, cs_pin);
+//!can_controller.
+//!        configure(
+//!             &Configuration {
+//!                 clock: ClockConfiguration {
+//!                     clock_output: ClockOutputDivisor::DivideBy10,
+//!                     system_clock: SystemClockDivisor::DivideBy1,
+//!                     disable_clock: false,
+//!                     pll: PLLSetting::TenTimesPLL,
+//!                 },
+//!                 fifo: FifoConfiguration {
+//!                     rx_size: 16,
+//!                     tx_attempts: RetransmissionAttempts::Three,
+//!                     tx_priority: 10,
+//!                     pl_size: PayloadSize::EightBytes,
+//!                     tx_size: 20,
+//!                     tx_enable: true,
+//!                 },
+//!                 mode: RequestMode::NormalCAN2_0,
+//!             },
+//!             &clock,
+//!         )
+//!         .unwrap();
+//!
+//!let can_id = Id::Standard(StandardId::new(0x55).unwrap());
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
