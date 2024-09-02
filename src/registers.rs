@@ -1,4 +1,5 @@
 use modular_bitfield_msb::prelude::*;
+
 /// Fourth byte of FIFO Control register
 #[bitfield]
 #[derive(Default)]

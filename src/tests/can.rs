@@ -276,6 +276,7 @@ fn test_transmit() {
 fn test_receive() {
     let mut mocks = Mocks::default();
 
+    let mut seq = Sequence::new();
     let id = ExtendedId::new(EXTENDED_ID).unwrap();
 
     // custom Rx message header for testing
@@ -284,10 +285,10 @@ fn test_receive() {
     let mut message_buff = [0u8; 16];
 
     // status register read
-    mocks.mock_register_read::<0b0000_0001>([0x30, 0x60]);
+    mocks.mock_register_read::<0b0000_0001>([0x30, 0x60], &mut seq);
 
     // user address register read
-    mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64]);
+    mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64], &mut seq);
 
     // Message read from RAM address 0x47C
     //transfer cmd+address
