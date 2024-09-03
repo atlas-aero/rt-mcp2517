@@ -182,13 +182,15 @@ impl Default for FifoConfiguration {
 }
 
 impl FifoConfiguration {
-    /// Encodes the configuration to RX FIFO configuration register byte
-    pub(crate) fn as_rx_register(&self) -> u8 {
+    /// Encodes the configuration for the third RX fifo control register byte
+    pub(crate) fn as_rx_register_3(&self) -> u8 {
         (Self::limit_size(self.rx_size) - 1) | ((self.pl_size as u8) << 5)
     }
 
     /// Encodes the configuration for the first TX configuration register byte
     pub(crate) fn as_tx_register_0(&self) -> u8 {
+        // bit 7 -> tx enable
+        // bit 0 -> tx fifo not full interrupt flag enable
         match self.tx_enable {
             true => 0b1000_0000,
             false => 0b0000_0000,
@@ -234,6 +236,8 @@ pub enum RequestMode {
     InternalLoopback,
     /// External loop back mode
     ExternalLoopback,
+    /// Listen only mode
+    ListenOnly,
     /// CAN 2.0 mode, possible error frames on CAN FD frames
     NormalCAN2_0,
 }
@@ -250,6 +254,7 @@ impl RequestMode {
             RequestMode::NormalCANFD => OperationMode::NormalCANFD,
             RequestMode::InternalLoopback => OperationMode::InternalLoopback,
             RequestMode::ExternalLoopback => OperationMode::ExternalLoopback,
+            RequestMode::ListenOnly => OperationMode::ListenOnly,
             RequestMode::NormalCAN2_0 => OperationMode::NormalCAN2_0,
         }
     }

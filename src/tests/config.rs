@@ -94,14 +94,14 @@ fn test_clock_configuration_to_register() {
 
 #[test]
 fn test_fifo_configuration_as_rx_register() {
-    assert_eq!(0b0000_0000, fifo_rx_config(0).as_rx_register());
-    assert_eq!(0b0000_0000, fifo_rx_config(1).as_rx_register());
+    assert_eq!(0b0000_0000, fifo_rx_config(0).as_rx_register_3());
+    assert_eq!(0b0000_0000, fifo_rx_config(1).as_rx_register_3());
 
-    assert_eq!(0b0000_0001, fifo_rx_config(2).as_rx_register());
-    assert_eq!(0b0000_1011, fifo_rx_config(12).as_rx_register());
+    assert_eq!(0b0000_0001, fifo_rx_config(2).as_rx_register_3());
+    assert_eq!(0b0000_1011, fifo_rx_config(12).as_rx_register_3());
 
-    assert_eq!(0b0001_1111, fifo_rx_config(32).as_rx_register());
-    assert_eq!(0b0001_1111, fifo_rx_config(33).as_rx_register());
+    assert_eq!(0b0001_1111, fifo_rx_config(32).as_rx_register_3());
+    assert_eq!(0b0001_1111, fifo_rx_config(33).as_rx_register_3());
 }
 
 #[test]
