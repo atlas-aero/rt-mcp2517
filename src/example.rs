@@ -26,17 +26,20 @@ impl Transfer<u8> for ExampleSPIBus {
 
         // RAM read command
         if words.len() == 8 && words == [0u8; 8] {
-            return Ok(&[1, 2, 3, 4, 5, 6, 7, 8]);
+            words.iter_mut().enumerate().for_each(|(i, val)| {
+                *val += (i + 1) as u8;
+            });
+            return Ok(&[0u8; 8]);
         }
 
         // SFR Read command
         if words[0] >= 0x3 {
-            self.read_calls += 1;
             return match words[1] {
                 // addr: C1CON reg 2
                 0x2 => {
                     // configuration mode
                     if self.read_calls == 0 {
+                        self.read_calls += 1;
                         return Ok(&[0, 0, 0b1001_0100]);
                     }
 
@@ -94,7 +97,6 @@ impl Default for ExampleClock {
         Self::new(vec![
             100,    // Config mode: Timer start,
             200,    // Config mode: First expiration check
-            300,    // Config mode: Second expiration check
             10_000, // Request mode: Timer start
             10_100, // Request mode: First expiration check
         ])
@@ -113,10 +115,7 @@ impl Clock for ExampleClock {
         Ok(Instant::new(self.next_instants.borrow_mut().remove(0)))
     }
 
-    fn new_timer<Dur: Duration>(&self, duration: Dur) -> Timer<OneShot, Armed, Self, Dur>
-    where
-        Dur: FixedPoint,
-    {
+    fn new_timer<Dur: Duration + FixedPoint>(&self, duration: Dur) -> Timer<OneShot, Armed, Self, Dur> {
         Timer::new(self, duration)
     }
 }

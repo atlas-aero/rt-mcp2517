@@ -1,3 +1,113 @@
+//! # Library for MCP2517FD CAN controller
+//!
+//! Crate currently offer the following features:
+//! * CAN2.0 and CAN FD (64 bytes) format support
+//! * Standard and extended ID formats for CAN frames
+//! * no_std support
+//!
+//!## Example
+//! For detailed example with rp-pico check [example](https://github.com/atlas-aero/rt-mcp2517/tree/main/example)
+//!
+//!## CAN Tx example
+//!
+//!```
+//!use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
+//!use mcp2517::can::Controller;
+//!use mcp2517::message::{Can20,TxMessage};
+//!use mcp2517::config::*;
+//!use bytes::Bytes;
+//!use embedded_can::{Id,StandardId};
+//!
+//!let cs_pin = ExampleCSPin{};
+//!let spi_bus = ExampleSPIBus::default();
+//!let clock = ExampleClock::default();
+//!
+//!let mut controller = Controller::new(spi_bus, cs_pin);
+//! // configure CAN controller
+//!controller
+//!    .configure(
+//!        &Configuration {
+//!            clock: ClockConfiguration {
+//!                clock_output: ClockOutputDivisor::DivideBy10,
+//!                system_clock: SystemClockDivisor::DivideBy1,
+//!                disable_clock: false,
+//!                pll: PLLSetting::TenTimesPLL,
+//!                 },
+//!            fifo: FifoConfiguration {
+//!                rx_size: 16,
+//!                tx_attempts: RetransmissionAttempts::Three,
+//!                tx_priority: 10,
+//!                pl_size: PayloadSize::EightBytes,
+//!                tx_size: 20,
+//!                tx_enable: true,
+//!                 },
+//!            mode: RequestMode::NormalCAN2_0,
+//!             },
+//!        &clock,
+//!         ).unwrap();
+//!
+//! // Create message frame
+//!let can_id = Id::Standard(StandardId::new(0x55).unwrap());
+//!let message_type = Can20 {};
+//!let payload = [1, 2, 3, 4, 5, 6, 7, 8];
+//!let pl_bytes = Bytes::copy_from_slice(&payload);
+//!let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
+//!// Transmit CAN message
+//!controller.transmit(&can_message).unwrap();
+//!```
+//!
+//!
+//!## CAN Rx example
+//!
+//!```
+//!use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
+//!use mcp2517::can::Controller;
+//!use mcp2517::message::{Can20,TxMessage};
+//!use mcp2517::filter::Filter;
+//!use mcp2517::config::*;
+//!use bytes::Bytes;
+//!use embedded_can::{Id,StandardId};
+//!
+//!let cs_pin = ExampleCSPin{};
+//!let spi_bus = ExampleSPIBus::default();
+//!let clock = ExampleClock::default();
+//!
+//!let mut controller = Controller::new(spi_bus, cs_pin);
+//! // configure CAN controller
+//!controller
+//!    .configure(
+//!        &Configuration {
+//!            clock: ClockConfiguration {
+//!                clock_output: ClockOutputDivisor::DivideBy10,
+//!                system_clock: SystemClockDivisor::DivideBy1,
+//!                disable_clock: false,
+//!                pll: PLLSetting::TenTimesPLL,
+//!                 },
+//!            fifo: FifoConfiguration {
+//!                rx_size: 16,
+//!                tx_attempts: RetransmissionAttempts::Three,
+//!                tx_priority: 10,
+//!                pl_size: PayloadSize::EightBytes,
+//!                tx_size: 20,
+//!                tx_enable: true,
+//!                 },
+//!            mode: RequestMode::NormalCAN2_0,
+//!             },
+//!        &clock,
+//!         ).unwrap();
+//!
+//!// Create and set filter
+//!let can_id = Id::Standard(StandardId::new(0x55).unwrap());
+//!let filter = Filter::new(can_id, 0).unwrap();
+//!let _ = controller.set_filter_object(filter);
+//!
+//!let mut buff = [0u8;8];
+//!// Receive CAN message
+//!let result = controller.receive(&mut buff);
+//!assert!(result.is_ok());
+//!assert_eq!(buff,[1,2,3,4,5,6,7,8]);
+//!```
+//!
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
@@ -128,6 +238,14 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         Ok(())
     }
 
+    /// Disable corresponding filter
+    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+        let filter_reg = Self::filter_control_register_byte(filter_index);
+        self.write_register(filter_reg, 0x00)?;
+
+        Ok(())
+    }
+
     /// Reads and returns the operation status
     pub fn read_operation_status(&mut self) -> Result<OperationStatus, BusError<B::Error, CS::Error>> {
         let data = self.read_register(REGISTER_C1CON + 2)?;
@@ -187,14 +305,6 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // Set FLTENm to enable filter
         self.write_register(filter_control_reg, (1 << 7) | fifo_index)?;
-
-        Ok(())
-    }
-
-    /// Disable corresponding filter
-    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
-        let filter_reg = Self::filter_control_register_byte(filter_index);
-        self.write_register(filter_reg, 0x00)?;
 
         Ok(())
     }
