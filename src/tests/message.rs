@@ -12,7 +12,7 @@ fn test_extended_id() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 8]);
     let extended_id = ExtendedId::new(EXTENDED_ID).unwrap();
 
-    let msg_type = Can20 {};
+    let msg_type = Can20::<8> {};
 
     let message = TxMessage::new(msg_type, payload_bytes, Id::Extended(extended_id)).unwrap();
 
@@ -26,7 +26,7 @@ fn test_standard_id() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 8]);
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let msg_type = Can20 {};
+    let msg_type = Can20::<8> {};
 
     let message = TxMessage::new(msg_type, payload_bytes, Id::Standard(standard_id)).unwrap();
 
@@ -40,7 +40,7 @@ fn test_dlc_success() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 13]);
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let msg_type = CanFd { bitrate_switch: false };
+    let msg_type = CanFd::<13> { bitrate_switch: false };
 
     let message = TxMessage::new(msg_type, payload_bytes, Id::Standard(standard_id)).unwrap();
 
@@ -60,8 +60,8 @@ fn test_dlc_error() {
     let payload_bytes_2_0 = Bytes::copy_from_slice(&data_2_0);
     let payload_bytes_fd = Bytes::copy_from_slice(&data_fd);
 
-    let can_msg_20 = Can20 {};
-    let can_msg_fd = CanFd { bitrate_switch: false };
+    let can_msg_20 = Can20::<10> {};
+    let can_msg_fd = CanFd::<65> { bitrate_switch: false };
 
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
