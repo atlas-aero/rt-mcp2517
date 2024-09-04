@@ -175,7 +175,7 @@ const STANDARD_ID: u16 = 0x6A5;
 fn test_transmit_can20() {
     let mut mocks = Mocks::default();
     let mut seq = Sequence::new();
-    let payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+    let mut payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
     let payload_bytes = Bytes::copy_from_slice(&payload);
 
     let msg_type = Can20 {};
@@ -232,6 +232,10 @@ fn test_transmit_can20() {
         .expect_transfer()
         .times(1)
         .returning(move |data| {
+            for word in payload.chunks_exact_mut(4) {
+                let num = BigEndian::read_u32(word);
+                LittleEndian::write_u32(word, num);
+            }
             assert_eq!(payload, data);
             Ok(&[0u8; 8])
         })
@@ -282,7 +286,7 @@ fn test_transmit_can20() {
 fn test_transmit_can_fd() {
     let mut mocks = Mocks::default();
     let mut seq = Sequence::new();
-    let payload = [1u8; 64];
+    let mut payload = [1u8; 64];
     let payload_bytes = Bytes::copy_from_slice(&payload);
 
     let msg_type = CanFd { bitrate_switch: false };
@@ -338,6 +342,10 @@ fn test_transmit_can_fd() {
         .expect_transfer()
         .times(1)
         .returning(move |data| {
+            for word in payload.chunks_exact_mut(4) {
+                let num = BigEndian::read_u32(word);
+                LittleEndian::write_u32(word, num);
+            }
             assert_eq!(payload, data);
             Ok(&[1u8; 64])
         })
@@ -426,8 +434,8 @@ fn test_receive() {
         .times(1)
         .returning(|data| {
             assert_eq!([0u8; 8], data);
-            data.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
-            Ok(&[1, 2, 3, 4, 5, 6, 7, 8])
+            data.copy_from_slice(&[4, 3, 2, 1, 8, 7, 6, 5]);
+            Ok(&[4, 3, 2, 1, 8, 7, 6, 5])
         })
         .in_sequence(&mut seq);
     mocks

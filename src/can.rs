@@ -352,6 +352,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         let mut data = [0u8; L];
         data.copy_from_slice(&message.buff);
 
+        for word in data.chunks_exact_mut(4) {
+            let num = BigEndian::read_u32(word);
+            LittleEndian::write_u32(word, num);
+        }
+
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
         buffer[2..].copy_from_slice(&message.header.into_bytes());
@@ -382,6 +387,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.bus.transfer(&mut buffer).map_err(TransferError)?;
         self.bus.transfer(data).map_err(TransferError)?;
         self.pin_cs.set_high().map_err(CSError)?;
+
+        for word in data.chunks_exact_mut(4) {
+            let num = BigEndian::read_u32(word);
+            LittleEndian::write_u32(word, num);
+        }
 
         Ok(())
     }
