@@ -60,8 +60,8 @@ fn test_dlc_error() {
     let payload_bytes_2_0 = Bytes::copy_from_slice(&data_2_0);
     let payload_bytes_fd = Bytes::copy_from_slice(&data_fd);
 
-    let can_msg_20 = Can20::<10> {};
-    let can_msg_fd = CanFd::<65> { bitrate_switch: false };
+    let can_msg_20 = Can20::<8> {};
+    let can_msg_fd = CanFd::<64> { bitrate_switch: false };
 
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 

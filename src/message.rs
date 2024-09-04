@@ -98,18 +98,19 @@ pub struct TxHeader {
 
 pub trait MessageType<const L: usize> {
     /// Setup CAN message header depending on message type
-    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError>;
+    fn setup_header(&self, header: &mut TxHeader, payload_length: usize) -> Result<(), DLCError>;
 }
 
-/// CAN 2.0 message type where L is the number of data bytes
+/// CAN 2.0 message type where L is the number  //  if payload_length > MAX_LENGTH {
 #[derive(Debug, Copy, Clone)]
 pub struct Can20<const L: usize> {}
 
 impl<const L: usize> MessageType<L> for Can20<L> {
-    fn setup_header(&self, _header: &mut TxHeader) -> Result<(), DLCError> {
-        if L > 8 {
-            debug!("Maximum of 8 bytes allowed. Current size: {L} bytes");
-            return Err(DLCError::InvalidLength(L));
+    fn setup_header(&self, _header: &mut TxHeader, payload_length: usize) -> Result<(), DLCError> {
+        if L > 8 || payload_length > 8 {
+            let max = payload_length.max(L);
+            debug!("Maximum of 8 bytes allowed. Current size: {max} bytes");
+            return Err(DLCError::InvalidLength(max));
         }
         Ok(())
     }
@@ -122,10 +123,11 @@ pub struct CanFd<const L: usize> {
 }
 
 impl<const L: usize> MessageType<L> for CanFd<L> {
-    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError> {
-        if L > 64 {
-            debug!("Maximum of 64 bytes allowed. Current size: {L} bytes");
-            return Err(DLCError::InvalidLength(L));
+    fn setup_header(&self, header: &mut TxHeader, payload_length: usize) -> Result<(), DLCError> {
+        if L > 64 || payload_length > 64 {
+            let max = payload_length.max(L);
+            debug!("Maximum of 64 bytes allowed. Current size: {max} bytes");
+            return Err(DLCError::InvalidLength(max));
         }
 
         header.set_bit_rate_switch(self.bitrate_switch);
@@ -151,12 +153,7 @@ impl<T: MessageType<L>, const L: usize> TxMessage<T, L> {
 
         let mut payload_length = data.len();
 
-        //  if payload_length > MAX_LENGTH {
-        //      debug!("Maximum of {MAX_LENGTH} bytes allowed. Current size: {payload_length} bytes");
-        //      return Err(DLCError::InvalidLength(payload_length));
-        //  }
-
-        message_type.setup_header(&mut header)?;
+        message_type.setup_header(&mut header, payload_length)?;
 
         // length used to choose the next supported DLC
         while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
