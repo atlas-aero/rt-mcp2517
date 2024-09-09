@@ -3,7 +3,7 @@ use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeT
 use crate::config::{ClockConfiguration, Configuration};
 use crate::filter::Filter;
 use crate::message::{MessageType, TxMessage};
-use crate::registers::{FifoControlReg1, FifoStatusReg0};
+use crate::registers::{FifoControlReg1, FifoStatusReg0, C1NBTCFG};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use core::marker::PhantomData;
@@ -103,7 +103,8 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
 
-        let nbr_reg = config.bit_rate.to_reg().into();
+        let nbr_values = config.bit_rate.calculate_values();
+        let nbr_reg = C1NBTCFG::from_bytes(nbr_values).into();
 
         self.write32(REGISTER_C1NBTCFG, nbr_reg)?;
 

@@ -1,4 +1,3 @@
-use crate::registers::C1NBTCFG;
 use crate::status::OperationMode;
 
 /// Entire configuration currently supported
@@ -302,7 +301,7 @@ pub struct BitRateConfig {
 }
 
 impl BitRateConfig {
-    fn calculate_values(&self) -> [u8; 4] {
+    pub fn calculate_values(&self) -> [u8; 4] {
         match (self.sys_clk, self.can_speed) {
             (SysClk::MHz20, CanBaudRate::Kbps1000) => [0, 13, 4, 1],
             (SysClk::MHz20, CanBaudRate::Kpbs500) | (SysClk::Mhz40, CanBaudRate::Kbps1000) => [0, 30, 7, 1],
@@ -316,13 +315,6 @@ impl BitRateConfig {
             | (SysClk::Mhz40, CanBaudRate::Kbps10)
             | (SysClk::Mhz40, CanBaudRate::Kbps5) => [0, 255, 63, 1],
         }
-    }
-
-    pub fn to_reg(&self) -> C1NBTCFG {
-        let mut reg = C1NBTCFG::default();
-        let vals = self.calculate_values();
-        reg.to_bytes(vals);
-        reg
     }
 }
 

@@ -2,6 +2,7 @@ use crate::config::{
     BitRateConfig, ClockConfiguration, ClockOutputDivisor, FifoConfiguration, PLLSetting, RetransmissionAttempts,
     SystemClockDivisor,
 };
+use crate::registers::C1NBTCFG;
 
 #[test]
 fn test_clock_from_register() {
@@ -188,7 +189,7 @@ fn test_fifo_configuration_as_tx_register_0() {
 #[test]
 fn test_bit_timing_config_correct() {
     let config = BitRateConfig::default();
-    let reg = config.to_reg();
+    let reg = C1NBTCFG::from_bytes(config.calculate_values());
     assert_eq!(reg.brp(), 0x00);
     assert_eq!(reg.tseg1(), 62);
     assert_eq!(reg.tseg2(), 15);

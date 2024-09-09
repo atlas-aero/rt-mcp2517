@@ -165,12 +165,3 @@ pub struct C1NBTCFG {
     /// Synchronization Jump Width bits
     pub sjw: B7,
 }
-
-impl C1NBTCFG {
-    pub fn to_bytes(&mut self, values: [u8; 4]) {
-        self.set_brp(values[0]);
-        self.set_tseg1(values[1]);
-        self.set_tseg2(values[2]);
-        self.set_sjw(values[3]);
-    }
-}
