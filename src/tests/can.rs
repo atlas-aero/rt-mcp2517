@@ -131,7 +131,7 @@ fn test_configure_correct() {
                     tx_enable: true,
                 },
                 mode: RequestMode::NormalCAN2_0,
-                bit_timing: BitRateConfig::default(),
+                bit_rate: BitRateConfig::default(),
             },
             &clock,
         )

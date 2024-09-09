@@ -111,7 +111,7 @@ fn main() -> ! {
         clock: clk_config,
         fifo: fifo_config,
         mode: RequestMode::InternalLoopback,
-        bit_timing: BitRateConfig::default(),
+        bit_rate: BitRateConfig::default(),
     };
 
     if let Err(_) = can_controller.configure(&config, &sys_clk) {

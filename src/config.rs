@@ -13,8 +13,8 @@ pub struct Configuration {
     /// Target request/operation mode
     pub mode: RequestMode,
 
-    /// Bit timing config
-    pub bit_timing: BitRateConfig,
+    /// Bit rate config
+    pub bit_rate: BitRateConfig,
 }
 
 /// Oscillator/Clock configuration

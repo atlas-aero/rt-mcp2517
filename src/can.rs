@@ -103,9 +103,9 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
 
-        let bit_timing_reg = config.bit_timing.to_reg().into();
+        let nbr_reg = config.bit_rate.to_reg().into();
 
-        self.write32(REGISTER_C1NBTCFG, bit_timing_reg)?;
+        self.write32(REGISTER_C1NBTCFG, nbr_reg)?;
 
         self.write_register(
             Self::fifo_control_register(FIFO_RX_INDEX) + 3,
