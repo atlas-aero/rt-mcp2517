@@ -146,3 +146,31 @@ pub struct FilterObjectReg {
     /// Standard ID filter rbits
     pub sid: B11,
 }
+
+/// Nominal bit time configuration register
+#[bitfield]
+#[derive(Default, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub struct C1NBTCFG {
+    /// Baud rate prescalar bits
+    pub brp: B8,
+    /// Time Segment 1 bits (Propagation Segment + Phase Segment 1)
+    pub tseg1: B8,
+    #[skip]
+    __: B1,
+    /// Time Segment 2 bits (Phase Segment 2)
+    pub tseg2: B7,
+    #[skip]
+    __: B1,
+    /// Synchronization Jump Width bits
+    pub sjw: B7,
+}
+
+impl C1NBTCFG {
+    pub fn to_bytes(&mut self, values: [u8; 4]) {
+        self.set_brp(values[0]);
+        self.set_tseg1(values[1]);
+        self.set_tseg2(values[2]);
+        self.set_sjw(values[3]);
+    }
+}

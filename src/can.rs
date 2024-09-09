@@ -17,6 +17,8 @@ const REGISTER_C1CON: u16 = 0x000;
 
 const REGISTER_OSC: u16 = 0xE00;
 
+const REGISTER_C1NBTCFG: u16 = 0x004;
+
 /// FIFO index for receiving CAN messages
 const FIFO_RX_INDEX: u8 = 1;
 
@@ -100,6 +102,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.enable_mode(OperationMode::Configuration, clock, ConfigurationModeTimeout)?;
 
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
+
+        let bit_timing_reg = config.bit_timing.to_reg().into();
+
+        self.write32(REGISTER_C1NBTCFG, bit_timing_reg)?;
 
         self.write_register(
             Self::fifo_control_register(FIFO_RX_INDEX) + 3,

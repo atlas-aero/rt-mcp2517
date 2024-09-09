@@ -1,5 +1,6 @@
 use crate::config::{
-    ClockConfiguration, ClockOutputDivisor, FifoConfiguration, PLLSetting, RetransmissionAttempts, SystemClockDivisor,
+    BitRateConfig, ClockConfiguration, ClockOutputDivisor, FifoConfiguration, PLLSetting, RetransmissionAttempts,
+    SystemClockDivisor,
 };
 
 #[test]
@@ -182,6 +183,16 @@ fn test_fifo_configuration_as_tx_register_0() {
         }
         .as_tx_register_0()
     );
+}
+
+#[test]
+fn test_bit_timing_config_correct() {
+    let config = BitRateConfig::default();
+    let reg = config.to_reg();
+    assert_eq!(reg.brp(), 0x00);
+    assert_eq!(reg.tseg1(), 62);
+    assert_eq!(reg.tseg2(), 15);
+    assert_eq!(reg.sjw(), 1);
 }
 
 fn fifo_rx_config(rx_size: u8) -> FifoConfiguration {
