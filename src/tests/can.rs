@@ -178,7 +178,7 @@ fn test_transmit_can20() {
     let payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
     let payload_bytes = Bytes::copy_from_slice(&payload);
 
-    let msg_type = Can20 {};
+    let msg_type = Can20::<8> {};
 
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
     let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
@@ -285,7 +285,7 @@ fn test_transmit_can_fd() {
     let payload = [1u8; 64];
     let payload_bytes = Bytes::copy_from_slice(&payload);
 
-    let msg_type = CanFd { bitrate_switch: false };
+    let msg_type = CanFd::<64> { bitrate_switch: false };
 
     let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
     let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
