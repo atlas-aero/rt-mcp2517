@@ -53,6 +53,9 @@ pub struct Configuration {
 
     /// Target request/operation mode
     pub mode: RequestMode,
+
+    /// Bit rate config
+    pub bit_rate: BitRateConfig,
 }
 
 /// Oscillator/Clock configuration
@@ -298,6 +301,72 @@ impl RequestMode {
             RequestMode::ExternalLoopback => OperationMode::ExternalLoopback,
             RequestMode::ListenOnly => OperationMode::ListenOnly,
             RequestMode::NormalCAN2_0 => OperationMode::NormalCAN2_0,
+        }
+    }
+}
+
+/// MCP2517FD clock speed
+#[derive(Copy, Debug, Clone)]
+pub enum SysClk {
+    /// Chip SYSCLK is 20 Mhz
+    MHz20,
+    /// Chip SYSCLK is 40 Mhz
+    Mhz40,
+}
+
+/// CAN bus baud rate
+#[derive(Copy, Debug, Clone)]
+pub enum CanBaudRate {
+    /// 1000 kilo bits per second
+    Kbps1000,
+    /// 500 kilo bits per second
+    Kpbs500,
+    /// 250 kilo bits per second
+    Kbps250,
+    /// 125 kilo bits per second
+    Kbps125,
+    /// 50 kilo bits per second
+    Kbps50,
+    /// 10 kilo bits per second
+    Kbps10,
+    /// 5 kilo bits per second
+    Kbps5,
+}
+
+/// Bit rate config
+#[derive(Clone, Debug)]
+pub struct BitRateConfig {
+    /// Operating speed of chip : SYSCLK
+    pub sys_clk: SysClk,
+    /// CAN Baud rate
+    pub can_speed: CanBaudRate,
+}
+
+impl BitRateConfig {
+    /// Calculate CiNBTCFG register values based on SYSCLK and desired baud rate
+    /// using this bit time calculations [Excel sheet](https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DesignChecklist/MCP2517FD+Bit+Time+Calculations+-+UG.xlsx)
+    pub fn calculate_values(&self) -> [u8; 4] {
+        match (self.sys_clk, self.can_speed) {
+            (SysClk::MHz20, CanBaudRate::Kbps1000) => [0, 13, 4, 1],
+            (SysClk::MHz20, CanBaudRate::Kpbs500) | (SysClk::Mhz40, CanBaudRate::Kbps1000) => [0, 30, 7, 1],
+            (SysClk::MHz20, CanBaudRate::Kbps250) | (SysClk::Mhz40, CanBaudRate::Kpbs500) => [0, 62, 15, 1],
+            (SysClk::MHz20, CanBaudRate::Kbps125) | (SysClk::Mhz40, CanBaudRate::Kbps250) => [0, 126, 31, 1],
+            (SysClk::MHz20, CanBaudRate::Kbps50)
+            | (SysClk::MHz20, CanBaudRate::Kbps10)
+            | (SysClk::MHz20, CanBaudRate::Kbps5)
+            | (SysClk::Mhz40, CanBaudRate::Kbps125)
+            | (SysClk::Mhz40, CanBaudRate::Kbps50)
+            | (SysClk::Mhz40, CanBaudRate::Kbps10)
+            | (SysClk::Mhz40, CanBaudRate::Kbps5) => [0, 255, 63, 1],
+        }
+    }
+}
+
+impl Default for BitRateConfig {
+    fn default() -> Self {
+        Self {
+            sys_clk: SysClk::MHz20,
+            can_speed: CanBaudRate::Kbps250,
         }
     }
 }

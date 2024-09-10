@@ -1,7 +1,7 @@
 use crate::can::{BusError, ConfigError, Controller};
 use crate::config::{
-    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize, RequestMode,
-    RetransmissionAttempts, SystemClockDivisor,
+    BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize,
+    RequestMode, RetransmissionAttempts, SystemClockDivisor,
 };
 use crate::message::{Can20, CanFd, TxMessage};
 use crate::mocks::{MockPin, MockSPIBus, TestClock};
@@ -45,6 +45,12 @@ fn test_configure_correct() {
     bus.expect_transfer().times(1).returning(move |data| {
         assert_eq!([0x2E, 0x0, 0b0110_0001], data);
         Ok(&[0x0, 0x0, 0x0])
+    });
+
+    // Writing NBT configuration register
+    bus.expect_transfer().times(1).returning(move |data| {
+        assert_eq!([0x20, 0x04, 1, 15, 62, 0], data);
+        Ok(&[0u8; 6])
     });
 
     // Writing RX FIFO configuration
@@ -103,8 +109,8 @@ fn test_configure_correct() {
     });
 
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(13).return_const(Ok(()));
-    pin_cs.expect_set_high().times(13).return_const(Ok(()));
+    pin_cs.expect_set_low().times(14).return_const(Ok(()));
+    pin_cs.expect_set_high().times(14).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     controller
@@ -125,6 +131,7 @@ fn test_configure_correct() {
                     tx_enable: true,
                 },
                 mode: RequestMode::NormalCAN2_0,
+                bit_rate: BitRateConfig::default(),
             },
             &clock,
         )
@@ -516,7 +523,7 @@ fn test_request_mode_timeout() {
     bus.expect_transfer().times(1).returning(move |_| Ok(&[0x0, 0x0, 0b1001_0100]));
 
     // Writing configuration registers
-    bus.expect_transfer().times(5).returning(move |_| Ok(&[0x0, 0x0, 0x0]));
+    bus.expect_transfer().times(6).returning(move |_| Ok(&[0x0, 0x0, 0x0]));
 
     // Enable filter for RX Fifo
     // filter disable
@@ -550,8 +557,8 @@ fn test_request_mode_timeout() {
     });
 
     let mut pin_cs = MockPin::new();
-    pin_cs.expect_set_low().times(14).return_const(Ok(()));
-    pin_cs.expect_set_high().times(14).return_const(Ok(()));
+    pin_cs.expect_set_low().times(15).return_const(Ok(()));
+    pin_cs.expect_set_high().times(15).return_const(Ok(()));
 
     let mut controller = Controller::new(bus, pin_cs);
     assert_eq!(

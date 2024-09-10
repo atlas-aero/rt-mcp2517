@@ -24,7 +24,7 @@ use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeT
 use crate::config::{ClockConfiguration, Configuration};
 use crate::filter::Filter;
 use crate::message::{MessageType, TxMessage};
-use crate::registers::{FifoControlReg1, FifoStatusReg0};
+use crate::registers::{FifoControlReg1, FifoStatusReg0, C1NBTCFG};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use core::marker::PhantomData;
@@ -37,6 +37,8 @@ use log::debug;
 const REGISTER_C1CON: u16 = 0x000;
 
 const REGISTER_OSC: u16 = 0xE00;
+
+const REGISTER_C1NBTCFG: u16 = 0x004;
 
 /// FIFO index for receiving CAN messages
 const FIFO_RX_INDEX: u8 = 1;
@@ -121,6 +123,11 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
         self.enable_mode(OperationMode::Configuration, clock, ConfigurationModeTimeout)?;
 
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
+
+        let nbr_values = config.bit_rate.calculate_values();
+        let nbr_reg = C1NBTCFG::from_bytes(nbr_values).into();
+
+        self.write32(REGISTER_C1NBTCFG, nbr_reg)?;
 
         self.write_register(
             Self::fifo_control_register(FIFO_RX_INDEX) + 3,
