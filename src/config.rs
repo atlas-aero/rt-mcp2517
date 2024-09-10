@@ -1,5 +1,3 @@
-//!
-//!
 //! # CAN Module configuration
 //! The [Configuration] struct provides an abstraction for configuring the CAN module registers.
 //! ## Fifo configuration
@@ -13,12 +11,12 @@
 //! use mcp2517::config::{FifoConfiguration,PayloadSize,RetransmissionAttempts};
 //!
 //! let fifo_config = FifoConfiguration{
-//! pl_size:PayloadSize::EightBytes,
-//! rx_size:10,
-//! tx_attempts:RetransmissionAttempts::Unlimited,
-//! tx_enable:true,
-//! tx_priority:32,
-//! tx_size:32,
+//!    pl_size: PayloadSize::EightBytes,
+//!    rx_size: 10,
+//!    tx_attempts: RetransmissionAttempts::Unlimited,
+//!    tx_enable: true,
+//!    tx_priority: 32,
+//!    tx_size: 32,
 //! };
 //!```
 //! ## Clock configuration
@@ -32,12 +30,22 @@
 //! use mcp2517::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
 //!
 //! let clock_config = ClockConfiguration{
-//! clock_output:ClockOutputDivisor::DivideBy2,
-//! system_clock:SystemClockDivisor::DivideBy1,
-//! pll:PLLSetting::DirectXTALOscillator,
-//! disable_clock:false,
+//!    clock_output: ClockOutputDivisor::DivideBy2,
+//!    system_clock: SystemClockDivisor::DivideBy1,
+//!    pll: PLLSetting::DirectXTALOscillator,
+//!    disable_clock: false,
 //! };
 //!```
+//! ## Bit rate configuration
+//! It is recommended to use a SYSCLK frequency of 20 MHz or 40 MHz for the MCP2517FD CAN chip.
+//! Based on the SYSCLK frequency used and the baud rate chosen, the CiNBTCFG regsiter values are configured.
+//!```
+//! use mcp2517::config::{BitRateConfig,CanBaudRate,SysClk};
+//!
+//! let bit_rate_config = BitRateConfig{
+//!    sys_clk: SysClk::MHz20,
+//!    can_speed: CanBaudRate::Kpbs500
+//! };
 //!
 //!
 use crate::status::OperationMode;

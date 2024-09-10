@@ -1,3 +1,19 @@
+//!# CAN Filter
+//! The [Filter] object is used to create a CAN filter. The MCP2517FD CAN chip has 32 filter/mask registers.
+//! Lower index of the filter means higher priority (highest priority =0, lowest priority = 31).
+//!
+//! ```
+//! use mcp2517::filter::Filter;
+//! use embedded_can::{Id,ExtendedId};
+//!
+//! // ID to match
+//! let id = Id::Extended(ExtendedId::new(0xC672).unwrap());
+//! // Create filter with index 2
+//! let mut filter = Filter::new(id,2).unwrap();
+//! // Set mask MSB bits, so that only the MSB of the message ID needs to match the filter
+//! filter.set_mask_extended_id(0xFF00);
+//!
+//!
 use crate::message::{EXTENDED_IDENTIFIER_MASK, STANDARD_IDENTIFIER_MASK};
 use crate::registers::{FilterMaskReg, FilterObjectReg};
 use embedded_can::{ExtendedId, Id, StandardId};
@@ -6,15 +22,15 @@ use embedded_can::{ExtendedId, Id, StandardId};
 #[derive(Default, Debug)]
 pub struct Filter {
     /// filter & mask index
-    pub index: u8,
+    pub(crate) index: u8,
     /// mask register bitfield
-    pub mask_bits: FilterMaskReg,
+    pub(crate) mask_bits: FilterMaskReg,
     /// filter register bitfield
-    pub filter_bits: FilterObjectReg,
+    pub(crate) filter_bits: FilterObjectReg,
 }
 
 impl Filter {
-    /// Create new filter from embedded_can::Id and index, no mask
+    /// Create new filter from [embedded_can::Id] and index, no mask
     pub fn new(identifier: Id, index: u8) -> Option<Self> {
         if index > 31 {
             return None;

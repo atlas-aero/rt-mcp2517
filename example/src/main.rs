@@ -121,7 +121,9 @@ fn main() -> ! {
     let can_id = Id::Standard(StandardId::new(0x55).unwrap());
 
     // Create filter object for RX
-    let filter = Filter::new(can_id, 0).unwrap();
+    let mut filter = Filter::new(can_id, 0).unwrap();
+    // Set mask to match if only 2 LSB of ID match with filter
+    filter.set_mask_standard_id(0xFF);
     let _ = can_controller.set_filter_object(filter);
 
     // Create message frame

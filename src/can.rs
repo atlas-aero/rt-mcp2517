@@ -1,4 +1,4 @@
-//!# CAN Controller
+//!# CAN Controller device
 //!
 //!```
 //! use mcp2517::can::Controller;
@@ -10,15 +10,14 @@
 //! let cs_pin = ExampleCSPin{};
 //!
 //! // Initialize controller object
-//! let mut can_controller = Controller::<_,_,sys_clk>::new(spi_bus,cs_pin);
+//! let mut can_controller = Controller::new(spi_bus,cs_pin);
 //!
 //! // Use default configuration settings
 //! let can_config = Configuration::default();
 //!
 //! // Configure CAN controller
-//! let controller = can_controller.configure(&can_config,&sys_clk).unwrap();
-//!
-//!
+//! can_controller.configure(&can_config, &sys_clk).unwrap();
+//! ```
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};

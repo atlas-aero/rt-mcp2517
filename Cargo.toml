@@ -29,5 +29,4 @@ mockall = "0.11.0"
 default = []
 strict = []
 
-[patch.crates-io]
-bytes = { git = "https://github.com/atlas-aero/rt-bytes.git", branch = "cfg_target_has_atomic_v1.6.0" }
+

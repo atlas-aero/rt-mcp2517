@@ -47,7 +47,11 @@
 //!                tx_size: 20,
 //!                tx_enable: true,
 //!                 },
-//!            mode: RequestMode::NormalCAN2_0,
+//!            mode: RequestMode::NormalCANFD,
+//!            bit_rate: BitRateConfig{
+//!                sys_clk: SysClk::MHz20,
+//!                can_speed: CanBaudRate::Kpbs500
+//!                },
 //!             },
 //!        &clock,
 //!         ).unwrap();

@@ -43,8 +43,8 @@ impl Transfer<u8> for ExampleSPIBus {
                         return Ok(&[0, 0, 0b1001_0100]);
                     }
 
-                    // return operation mode CAN2.0 (called in configure and during transmission)
-                    Ok(&[0x0, 0x0, 0b1100_0000])
+                    // return operation mode NormalCANFD mode (called in configure and during transmission)
+                    Ok(&[0x0, 0x0, 0b0000_0000])
                 }
                 // C1FIFOSTA2
                 0x6C => Ok(&[0, 0, 0x1]),

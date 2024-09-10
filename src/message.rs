@@ -10,7 +10,7 @@
 //!use embedded_can::{Id,StandardId};
 //!
 //! // Frame ID
-//! let message_id = Id::Standard(StandardId::new(0x1234).unwrap());
+//! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
 //! // Set message type to CAN2.0
 //! let message_type = Can20{};
 //! // Create payload buffer
@@ -21,6 +21,7 @@
 //! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
 //!```
 //!
+
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;
