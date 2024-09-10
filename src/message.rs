@@ -1,3 +1,26 @@
+//!# CAN Message
+//! This library supports both CAN2.0 (up two 8 data bytes per CAN Frame)
+//! and CAN FD (up to 64 data bytes per CAN frame)
+//! formats with both standard and extended frame ID formats
+//!
+//! ## Message construction example
+//! ```
+//!use bytes::Bytes;
+//!use mcp2517::message::{Can20,TxMessage};
+//!use embedded_can::{Id,StandardId};
+//!
+//! // Frame ID
+//! let message_id = Id::Standard(StandardId::new(0x1234).unwrap());
+//! // Set message type to CAN2.0
+//! let message_type = Can20{};
+//! // Create payload buffer
+//! let payload = [1,2,3,4,5,6,7,8];
+//! // Create Bytes object
+//! let bytes = Bytes::copy_from_slice(&payload);
+//! // Create message object
+//! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
+//!```
+//!
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;

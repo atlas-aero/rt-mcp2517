@@ -1,3 +1,45 @@
+//!
+//!
+//! # CAN Module configuration
+//! The [Configuration] struct provides an abstraction for configuring the CAN module registers.
+//! ## Fifo configuration
+//! The following example shows a FIFO buffer configuration. At the moment, there is one TX Fifo and one
+//! Rx Fifo. The configuration sets the max payload size of messages transmitted/received in both Fifo buffers
+//! to 8 bytes. The number of message the Rx Fifo buffer can hold is 10 while it is 32 for the Tx Fifo.
+//!
+//! The priority for the messages in the Tx Fifo are given the highest possible priority (32) and the retransmission
+//! attemps are set to be unlimited.
+//!```
+//! use mcp2517::config::{FifoConfiguration,PayloadSize,RetransmissionAttempts};
+//!
+//! let fifo_config = FifoConfiguration{
+//! pl_size:PayloadSize::EightBytes,
+//! rx_size:10,
+//! tx_attempts:RetransmissionAttempts::Unlimited,
+//! tx_enable:true,
+//! tx_priority:32,
+//! tx_size:32,
+//! };
+//!```
+//! ## Clock configuration
+//! The CAN system clock is determined through setting the `system_clock` and `pll`. In this example,
+//! the pll setting used is to directly use the crystal oscillator without any multiplication, and the
+//! `system_clock` divisor is set to 1. Meaning the frequency of the SYSCLK matches the crystal used.
+//! The `clock_output` divisior is set to 2. So that the CLKO outputs half the freq of the crystal.
+//! Refer to the [datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/MCP2517FD-External-CAN-FD-Controller-with-SPI-Interface-20005688B.pdf) section 5.0
+//!
+//!```
+//! use mcp2517::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
+//!
+//! let clock_config = ClockConfiguration{
+//! clock_output:ClockOutputDivisor::DivideBy2,
+//! system_clock:SystemClockDivisor::DivideBy1,
+//! pll:PLLSetting::DirectXTALOscillator,
+//! disable_clock:false,
+//! };
+//!```
+//!
+//!
 use crate::status::OperationMode;
 
 /// Entire configuration currently supported
