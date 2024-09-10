@@ -11,8 +11,8 @@
 //!
 //! // Frame ID
 //! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
-//! // Set message type to CAN2.0
-//! let message_type = Can20{};
+//! // Set message type to CAN2.0 with 8 data bytes
+//! let message_type = Can20::<8>{};
 //! // Create payload buffer
 //! let payload = [1,2,3,4,5,6,7,8];
 //! // Create Bytes object

@@ -58,7 +58,7 @@
 //!
 //! // Create message frame
 //!let can_id = Id::Standard(StandardId::new(0x55).unwrap());
-//!let message_type = Can20 {};
+//!let message_type = Can20::<8> {};
 //!let payload = [1, 2, 3, 4, 5, 6, 7, 8];
 //!let pl_bytes = Bytes::copy_from_slice(&payload);
 //!let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
