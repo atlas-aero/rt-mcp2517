@@ -101,7 +101,7 @@ pub struct TxHeader {
 
 pub trait MessageType<const L: usize> {
     /// Setup CAN message header depending on message type
-    fn setup_header(&self, _header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError>;
+    fn setup_header(&self, header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError>;
 }
 
 /// CAN 2.0 message type where `L` is the max number of payload bytes.
@@ -110,7 +110,7 @@ pub trait MessageType<const L: usize> {
 pub struct Can20<const L: usize> {}
 
 impl<const L: usize> MessageType<L> for Can20<L> {
-    fn setup_header(&self, _header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError> {
+    fn setup_header(&self, header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError> {
         if L > 8 || payload_length > 8 {
             let max = payload_length.max(L);
             debug!("Maximum of 64 bytes allowed. Current size: {max} bytes");
