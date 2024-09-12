@@ -15,7 +15,7 @@ use embedded_hal::delay::DelayNs;
 use fugit::RateExtU32;
 use mcp2517::can::Controller;
 use mcp2517::config::{
-    ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RequestMode,
+    BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RequestMode,
     SystemClockDivisor,
 };
 use mcp2517::filter::Filter;
@@ -111,6 +111,7 @@ fn main() -> ! {
         clock: clk_config,
         fifo: fifo_config,
         mode: RequestMode::InternalLoopback,
+        bit_rate: BitRateConfig::default(),
     };
 
     if let Err(_) = can_controller.configure(&config, &sys_clk) {
