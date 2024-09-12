@@ -62,6 +62,8 @@ pub enum Error<B, CS> {
     InvalidPayloadLength(usize),
     /// Invalid Ram Address region error
     InvalidRamAddress(u16),
+    /// Payload buffer length not a multiple of 4 bytes
+    InvalidBufferSize(usize),
 }
 
 impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
@@ -316,7 +318,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
 
     /// Receive CAN Message
-    pub fn receive(&mut self, data: &mut [u8]) -> Result<(), Error<B::Error, CS::Error>> {
+    pub fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Error<B::Error, CS::Error>> {
         let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
 
         let mut rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
@@ -357,7 +359,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
 
         // copy message data into mutable buffer
         let mut data = [0u8; L];
-        data.copy_from_slice(&message.buff);
+        data[..message.buff.len()].copy_from_slice(&message.buff);
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
@@ -377,9 +379,18 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     }
 
     /// Read message from RX FIFO
-    fn read_fifo(&mut self, register: u16, data: &mut [u8]) -> Result<(), Error<B::Error, CS::Error>> {
+    pub(crate) fn read_fifo<const L: usize>(
+        &mut self,
+        register: u16,
+        data: &mut [u8; L],
+    ) -> Result<(), Error<B::Error, CS::Error>> {
+        if L % 4 != 0 {
+            return Err(Error::InvalidBufferSize(L));
+        }
+
         let payload_address = register + 8;
         let mut buffer = [0u8; 2];
+
         let command = (payload_address & 0x0FFF) | ((Operation::Read as u16) << 12);
 
         buffer[0] = (command >> 8) as u8;

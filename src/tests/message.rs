@@ -1,4 +1,4 @@
-use crate::message::{Can20, CanFd, DLCError, TxMessage, DLC};
+use crate::message::{Can20, CanFd, MessageError, TxMessage, DLC};
 use bytes::Bytes;
 use embedded_can::Id;
 use embedded_can::{ExtendedId, StandardId};
@@ -40,7 +40,7 @@ fn test_dlc_success() {
     let payload_bytes = Bytes::copy_from_slice(&[0u8; 13]);
     let standard_id = StandardId::new(STANDARD_ID).unwrap();
 
-    let msg_type = CanFd::<13> { bitrate_switch: false };
+    let msg_type = CanFd::<16> { bitrate_switch: false };
 
     let message = TxMessage::new(msg_type, payload_bytes, Id::Standard(standard_id)).unwrap();
 
@@ -68,6 +68,46 @@ fn test_dlc_error() {
     let message_2_0 = TxMessage::new(can_msg_20, payload_bytes_2_0, Id::Standard(standard_id));
     let message_fd = TxMessage::new(can_msg_fd, payload_bytes_fd, Id::Standard(standard_id));
 
-    assert_eq!(message_2_0.unwrap_err(), DLCError::InvalidLength(10));
-    assert_eq!(message_fd.unwrap_err(), DLCError::InvalidLength(65));
+    assert_eq!(message_2_0.unwrap_err(), MessageError::InvalidLength(10));
+    assert_eq!(message_fd.unwrap_err(), MessageError::InvalidLength(65));
+}
+
+#[test]
+fn test_message_size_divisible_by_four_error() {
+    let data_2_0 = [0u8; 6];
+    let data_fd = [0u8; 26];
+
+    let payload_bytes_2_0 = Bytes::copy_from_slice(&data_2_0);
+    let payload_bytes_fd = Bytes::copy_from_slice(&data_fd);
+
+    let can_msg_20 = Can20::<6> {};
+    let can_msg_fd = CanFd::<26> { bitrate_switch: false };
+
+    let standard_id = StandardId::new(STANDARD_ID).unwrap();
+
+    let message_2_0 = TxMessage::new(can_msg_20, payload_bytes_2_0, Id::Standard(standard_id));
+    let message_fd = TxMessage::new(can_msg_fd, payload_bytes_fd, Id::Standard(standard_id));
+
+    assert_eq!(message_2_0.unwrap_err(), MessageError::InvalidTypeSize(6));
+    assert_eq!(message_fd.unwrap_err(), MessageError::InvalidTypeSize(26));
+}
+
+#[test]
+fn test_payload_greater_than_generic_type_args() {
+    let data_2_0 = [0u8; 5];
+    let data_fd = [0u8; 23];
+
+    let payload_bytes_2_0 = Bytes::copy_from_slice(&data_2_0);
+    let payload_bytes_fd = Bytes::copy_from_slice(&data_fd);
+
+    let can_msg_20 = Can20::<4> {};
+    let can_msg_fd = CanFd::<20> { bitrate_switch: false };
+
+    let standard_id = StandardId::new(STANDARD_ID).unwrap();
+
+    let message_2_0 = TxMessage::new(can_msg_20, payload_bytes_2_0, Id::Standard(standard_id));
+    let message_fd = TxMessage::new(can_msg_fd, payload_bytes_fd, Id::Standard(standard_id));
+
+    assert_eq!(message_2_0.unwrap_err(), MessageError::InvalidLength(5));
+    assert_eq!(message_fd.unwrap_err(), MessageError::InvalidLength(23));
 }
