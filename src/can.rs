@@ -79,7 +79,7 @@ impl<B, CS> From<ConfigError<B, CS>> for Error<B, CS> {
 }
 
 /// Main MCP2517 CAN controller device
-pub struct Controller<B: Transfer<u8>, CS: OutputPin, CLK: Clock> {
+pub struct MCP2517<B: Transfer<u8>, CS: OutputPin, CLK: Clock> {
     /// SPI bus
     bus: B,
 
@@ -90,7 +90,96 @@ pub struct Controller<B: Transfer<u8>, CS: OutputPin, CLK: Clock> {
     clock: PhantomData<CLK>,
 }
 
-impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
+/// Trait for CAN controller
+pub trait CanController {
+    type Error;
+
+    /// Transmit CAN message
+    fn transmit<const L: usize, T: MessageType<L>>(&mut self, message: &TxMessage<T, L>) -> Result<(), Self::Error>;
+
+    /// Receive CAN message
+    fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Self::Error>;
+}
+
+impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS, CLK> {
+    type Error = Error<B::Error, CS::Error>;
+
+    fn transmit<const L: usize, T: MessageType<L>>(&mut self, message: &TxMessage<T, L>) -> Result<(), Self::Error> {
+        // make sure there is space for new message in TX FIFO
+        // read byte 0 of TX FIFO status register
+        let status_reg_addr = Self::fifo_status_register(FIFO_TX_INDEX);
+
+        let mut txfifo_status_byte0 = self.read_register(status_reg_addr)?;
+        let mut txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+
+        // block until there is room available for new message in TX FIFO
+        while !txfifo_status_reg0.tfnrfnif() {
+            txfifo_status_byte0 = self.read_register(status_reg_addr)?;
+            txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+        }
+
+        // make sure length of payload is consistent with CAN operation mode
+        let operation_status = self.read_operation_status()?;
+
+        if message.buff.len() > 8 && operation_status.mode != OperationMode::NormalCANFD {
+            return Err(Error::InvalidPayloadLength(message.buff.len()));
+        }
+
+        // get address in which to write next message in TX FIFO (should not be read in configuration mode)
+        let user_address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
+
+        // calculate address of next Message Object according to
+        // Equation 4-1 in MCP251XXFD Family Reference Manual
+        let address = user_address + 0x400;
+
+        // get address of TX FIFO control register byte 1
+        let fifo_control_reg1 = Self::fifo_control_register(FIFO_TX_INDEX) + 1;
+
+        // load message in TX FIFO
+        self.write_fifo::<T, L>(address as u16, message)?;
+
+        // Request transmission (set txreq) and set uinc in TX FIFO control register byte 1
+        self.write_register(fifo_control_reg1, 0x03)?;
+
+        // read TX FIFO control register byte 1
+        let mut txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
+        let mut txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
+
+        // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
+        while txfifo_control_reg.txreq() {
+            txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
+            txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
+        }
+        Ok(())
+    }
+
+    fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Self::Error> {
+        let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
+
+        let mut rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
+        let mut rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
+
+        // block until fifo rx contains at least one message
+        while !rxfifo_status_reg0.tfnrfnif() {
+            rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
+            rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
+        }
+
+        let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
+
+        let address = 0x400 + user_address;
+
+        // read message object
+        self.read_fifo(address as u16, data)?;
+
+        // set UINC bit for incrementing the FIFO head by a single message
+        self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
+
+        Ok(())
+    }
+}
+
+impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     pub fn new(bus: B, pin_cs: CS) -> Self {
         Self {
             bus,
@@ -260,85 +349,6 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> Controller<B, CS, CLK> {
     pub fn reset(&mut self) -> Result<(), BusError<B::Error, CS::Error>> {
         let mut buffer = self.cmd_buffer(0u16, Operation::Reset);
         self.transfer(&mut buffer)?;
-
-        Ok(())
-    }
-
-    /// Transmit CAN Message
-    pub fn transmit<T, const L: usize>(&mut self, message: &TxMessage<T, L>) -> Result<(), Error<B::Error, CS::Error>>
-    where
-        T: MessageType<L>,
-    {
-        // make sure there is space for new message in TX FIFO
-        // read byte 0 of TX FIFO status register
-        let status_reg_addr = Self::fifo_status_register(FIFO_TX_INDEX);
-
-        let mut txfifo_status_byte0 = self.read_register(status_reg_addr)?;
-        let mut txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
-
-        // block until there is room available for new message in TX FIFO
-        while !txfifo_status_reg0.tfnrfnif() {
-            txfifo_status_byte0 = self.read_register(status_reg_addr)?;
-            txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
-        }
-
-        // make sure length of payload is consistent with CAN operation mode
-        let operation_status = self.read_operation_status()?;
-
-        if message.buff.len() > 8 && operation_status.mode != OperationMode::NormalCANFD {
-            return Err(Error::InvalidPayloadLength(message.buff.len()));
-        }
-
-        // get address in which to write next message in TX FIFO (should not be read in configuration mode)
-        let user_address = self.read32(Self::fifo_user_address_register(FIFO_TX_INDEX))?;
-
-        // calculate address of next Message Object according to
-        // Equation 4-1 in MCP251XXFD Family Reference Manual
-        let address = user_address + 0x400;
-
-        // get address of TX FIFO control register byte 1
-        let fifo_control_reg1 = Self::fifo_control_register(FIFO_TX_INDEX) + 1;
-
-        // load message in TX FIFO
-        self.write_fifo::<T, L>(address as u16, message)?;
-
-        // Request transmission (set txreq) and set uinc in TX FIFO control register byte 1
-        self.write_register(fifo_control_reg1, 0x03)?;
-
-        // read TX FIFO control register byte 1
-        let mut txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
-        let mut txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
-
-        // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
-        while txfifo_control_reg.txreq() {
-            txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
-            txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
-        }
-        Ok(())
-    }
-
-    /// Receive CAN Message
-    pub fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Error<B::Error, CS::Error>> {
-        let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
-
-        let mut rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
-        let mut rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
-
-        // block until fifo rx contains at least one message
-        while !rxfifo_status_reg0.tfnrfnif() {
-            rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
-            rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
-        }
-
-        let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
-
-        let address = 0x400 + user_address;
-
-        // read message object
-        self.read_fifo(address as u16, data)?;
-
-        // set UINC bit for incrementing the FIFO head by a single message
-        self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
 
         Ok(())
     }
