@@ -25,6 +25,8 @@ const FIFO_RX_INDEX: u8 = 1;
 /// FIFO index for transmitting CAN messages
 const FIFO_TX_INDEX: u8 = 2;
 
+pub trait Mcp2517Error {}
+
 /// General SPI Errors
 #[derive(Debug, PartialEq)]
 pub enum BusError<B, CS> {
@@ -66,6 +68,8 @@ pub enum Error<B, CS> {
     InvalidBufferSize(usize),
 }
 
+impl<B, CS> Mcp2517Error for Error<B, CS> {}
+
 impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
     fn from(value: BusError<B, CS>) -> Self {
         Error::BusErr(value)
@@ -92,13 +96,15 @@ pub struct MCP2517<B: Transfer<u8>, CS: OutputPin, CLK: Clock> {
 
 /// Trait for CAN controller
 pub trait CanController {
-    type Error;
+    type Error: Mcp2517Error;
 
     /// Transmit CAN message
     fn transmit<const L: usize, T: MessageType<L>>(&mut self, message: &TxMessage<T, L>) -> Result<(), Self::Error>;
 
     /// Receive CAN message
     fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Self::Error>;
+
+    fn set_filter_object(&mut self, filter: Filter) -> Result<(), Self::Error>;
 }
 
 impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS, CLK> {
@@ -174,6 +180,27 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
 
         // set UINC bit for incrementing the FIFO head by a single message
         self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
+
+        Ok(())
+    }
+
+    /// Set corresponding filter and mask registers
+    fn set_filter_object(&mut self, filter: Filter) -> Result<(), Self::Error> {
+        let filter_object_reg = Self::filter_object_register(filter.index);
+        let filter_mask_reg = Self::filter_mask_register(filter.index);
+
+        self.disable_filter(filter.index)?;
+
+        let filter_value = u32::from(filter.filter_bits);
+        let mask_value = u32::from(filter.mask_bits);
+
+        self.write32(filter_object_reg, filter_value)?;
+
+        self.write32(filter_mask_reg, mask_value)?;
+
+        let filter_control_reg = Self::filter_control_register_byte(filter.index);
+
+        self.write_register(filter_control_reg, (1 << 7) | 1)?;
 
         Ok(())
     }
@@ -293,27 +320,6 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
         let filter_reg = Self::filter_control_register_byte(filter_index);
         self.write_register(filter_reg, 0x00)?;
-
-        Ok(())
-    }
-
-    /// Set corresponding filter and mask registers
-    pub fn set_filter_object(&mut self, filter: Filter) -> Result<(), BusError<B::Error, CS::Error>> {
-        let filter_object_reg = Self::filter_object_register(filter.index);
-        let filter_mask_reg = Self::filter_mask_register(filter.index);
-
-        self.disable_filter(filter.index)?;
-
-        let filter_value = u32::from(filter.filter_bits);
-        let mask_value = u32::from(filter.mask_bits);
-
-        self.write32(filter_object_reg, filter_value)?;
-
-        self.write32(filter_mask_reg, mask_value)?;
-
-        let filter_control_reg = Self::filter_control_register_byte(filter.index);
-
-        self.write_register(filter_control_reg, (1 << 7) | 1)?;
 
         Ok(())
     }
