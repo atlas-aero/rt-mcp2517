@@ -96,7 +96,7 @@ pub struct MCP2517<B: Transfer<u8>, CS: OutputPin, CLK: Clock> {
 
 /// Trait for CAN controller
 pub trait CanController {
-    type Error: Mcp2517Error;
+    type Error;
 
     /// Transmit CAN message
     fn transmit<const L: usize, T: MessageType<L>>(&mut self, message: &TxMessage<T, L>) -> Result<(), Self::Error>;
