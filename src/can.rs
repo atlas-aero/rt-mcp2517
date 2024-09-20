@@ -25,8 +25,6 @@ const FIFO_RX_INDEX: u8 = 1;
 /// FIFO index for transmitting CAN messages
 const FIFO_TX_INDEX: u8 = 2;
 
-pub trait Mcp2517Error {}
-
 /// General SPI Errors
 #[derive(Debug, PartialEq)]
 pub enum BusError<B, CS> {
@@ -67,8 +65,6 @@ pub enum Error<B, CS> {
     /// Payload buffer length not a multiple of 4 bytes
     InvalidBufferSize(usize),
 }
-
-impl<B, CS> Mcp2517Error for Error<B, CS> {}
 
 impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
     fn from(value: BusError<B, CS>) -> Self {
