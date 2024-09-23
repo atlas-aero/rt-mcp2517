@@ -99,7 +99,7 @@ pub trait CanController {
 
     /// Receive CAN message
     fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Self::Error>;
-
+    /// Set corresponding filter and mask registers
     fn set_filter_object(&mut self, filter: Filter) -> Result<(), Self::Error>;
 }
 
