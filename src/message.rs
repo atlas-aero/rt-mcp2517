@@ -165,11 +165,11 @@ impl<const L: usize> MessageType<L> for CanFd<L> {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxMessage<T: MessageType<L>, const L: usize> {
     /// first 2 bytes of Transmit Message Object
-    pub(crate) header: TxHeader,
+    pub header: TxHeader,
     /// Payload bytes of Message Object
-    pub(crate) buff: Bytes,
+    pub buff: Bytes,
     /// CAN message type (CAN 2.0 or CAN FD)
-    pub(crate) message_type: T,
+    pub message_type: T,
 }
 
 impl<T: MessageType<L>, const L: usize> TxMessage<T, L> {
