@@ -1,4 +1,5 @@
-use crate::can::{BusError, ConfigError, Controller, Error};
+use crate::can::CanController;
+use crate::can::{BusError, ConfigError, Error, MCP2517};
 use crate::config::{
     BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize,
     RequestMode, RetransmissionAttempts, SystemClockDivisor,
@@ -112,7 +113,7 @@ fn test_configure_correct() {
     pin_cs.expect_set_low().times(14).return_const(Ok(()));
     pin_cs.expect_set_high().times(14).return_const(Ok(()));
 
-    let mut controller = Controller::new(bus, pin_cs);
+    let mut controller = MCP2517::new(bus, pin_cs);
     controller
         .configure(
             &Configuration {
@@ -168,7 +169,7 @@ fn test_configure_mode_timeout() {
     pin_cs.expect_set_low().times(3).return_const(Ok(()));
     pin_cs.expect_set_high().times(3).return_const(Ok(()));
 
-    let mut controller = Controller::new(bus, pin_cs);
+    let mut controller = MCP2517::new(bus, pin_cs);
     assert_eq!(
         ConfigError::ConfigurationModeTimeout,
         controller.configure(&Configuration::default(), &clock).unwrap_err()
@@ -676,7 +677,7 @@ fn test_request_mode_timeout() {
     pin_cs.expect_set_low().times(15).return_const(Ok(()));
     pin_cs.expect_set_high().times(15).return_const(Ok(()));
 
-    let mut controller = Controller::new(bus, pin_cs);
+    let mut controller = MCP2517::new(bus, pin_cs);
     assert_eq!(
         ConfigError::RequestModeTimeout,
         controller.configure(&Configuration::default(), &clock).unwrap_err()
@@ -947,8 +948,8 @@ pub(crate) struct Mocks {
 }
 
 impl Mocks {
-    pub fn into_controller(self) -> Controller<MockSPIBus, MockPin, TestClock> {
-        Controller::new(self.bus, self.pin_cs)
+    pub fn into_controller(self) -> MCP2517<MockSPIBus, MockPin, TestClock> {
+        MCP2517::new(self.bus, self.pin_cs)
     }
 
     /// Simulates a SPI transfer fault

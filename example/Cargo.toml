@@ -23,6 +23,7 @@ rp-pico = "0.9.0"
 rp2040-boot2 = "0.3.0"
 embedded-can = "0.4.1"
 bytes = { version = "1.6.0", default-features = false }
+portable-atomic = { version = "1.8.0", features = ["critical-section"] }
 log = "0.4.21"
 usb-device = "0.3.2"
 usbd-serial = "0.2.2"
