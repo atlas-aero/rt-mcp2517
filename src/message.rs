@@ -206,7 +206,7 @@ impl<T: MessageType<L>, const L: usize> TxMessage<T, L> {
 
     /// Returns payload as a `&[u8]`
     pub fn get_payload(&self) -> &[u8] {
-        &self.buff.as_ref()
+        self.buff.as_ref()
     }
 
     /// Returns Header register of Transmit Message Object
