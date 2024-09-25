@@ -165,14 +165,15 @@ impl<const L: usize> MessageType<L> for CanFd<L> {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TxMessage<T: MessageType<L>, const L: usize> {
     /// first 2 bytes of Transmit Message Object
-    pub header: TxHeader,
+    pub(crate) header: TxHeader,
     /// Payload bytes of Message Object
-    pub buff: Bytes,
+    pub(crate) buff: Bytes,
     /// CAN message type (CAN 2.0 or CAN FD)
-    pub message_type: T,
+    pub(crate) message_type: T,
 }
 
 impl<T: MessageType<L>, const L: usize> TxMessage<T, L> {
+    /// Create new CAN message
     pub fn new(message_type: T, data: Bytes, identifier: Id) -> Result<Self, MessageError> {
         let mut header = TxHeader::new();
 
@@ -201,6 +202,16 @@ impl<T: MessageType<L>, const L: usize> TxMessage<T, L> {
             buff: data,
             message_type,
         })
+    }
+
+    /// Returns payload as a `&[u8]`
+    pub fn get_payload(&self) -> &[u8] {
+        &self.buff.as_ref()
+    }
+
+    /// Returns Header register of Transmit Message Object
+    pub fn get_header(&self) -> &TxHeader {
+        &self.header
     }
 }
 

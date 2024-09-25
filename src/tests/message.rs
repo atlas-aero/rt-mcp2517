@@ -111,3 +111,15 @@ fn test_payload_greater_than_generic_type_args() {
     assert_eq!(message_2_0.unwrap_err(), MessageError::InvalidLength(5));
     assert_eq!(message_fd.unwrap_err(), MessageError::InvalidLength(23));
 }
+
+#[test]
+fn test_get_payload() {
+    let payload_bytes = Bytes::copy_from_slice(&[1u8; 8]);
+    let standard_id = StandardId::new(STANDARD_ID).unwrap();
+
+    let msg_type = Can20::<8> {};
+
+    let message = TxMessage::new(msg_type, payload_bytes, Id::Standard(standard_id)).unwrap();
+
+    assert_eq!(message.get_payload(), &[1u8; 8]);
+}
