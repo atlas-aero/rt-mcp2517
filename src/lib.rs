@@ -17,7 +17,7 @@
 //!
 //!```
 //!use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
-//!use mcp2517::can::Controller;
+//!use mcp2517::can::{MCP2517,CanController};
 //!use mcp2517::message::{Can20,TxMessage};
 //!use mcp2517::filter::Filter;
 //!use mcp2517::config::*;
@@ -28,7 +28,7 @@
 //!let spi_bus = ExampleSPIBus::default();
 //!let clock = ExampleClock::default();
 //!
-//!let mut controller = Controller::new(spi_bus, cs_pin);
+//!let mut controller = MCP2517::new(spi_bus, cs_pin);
 //! // configure CAN controller
 //!controller
 //!    .configure(
@@ -58,6 +58,10 @@
 //!
 //! // Create message frame
 //!let can_id = Id::Standard(StandardId::new(0x55).unwrap());
+//! // Important note: Generic arg for message type for CAN2.0
+//! // should be either 4 or 8, the DLC will be based off the
+//! // length of the payload buffer. So for a payload of 5 bytes
+//! // you can only use Can20::<8> as the message type
 //!let message_type = Can20::<8> {};
 //!let payload = [1, 2, 3, 4, 5, 6, 7, 8];
 //!let pl_bytes = Bytes::copy_from_slice(&payload);

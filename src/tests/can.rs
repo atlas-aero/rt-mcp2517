@@ -1,4 +1,5 @@
-use crate::can::{BusError, ConfigError, Controller};
+use crate::can::CanController;
+use crate::can::{BusError, ConfigError, Error, MCP2517};
 use crate::config::{
     BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize,
     RequestMode, RetransmissionAttempts, SystemClockDivisor,
@@ -112,7 +113,7 @@ fn test_configure_correct() {
     pin_cs.expect_set_low().times(14).return_const(Ok(()));
     pin_cs.expect_set_high().times(14).return_const(Ok(()));
 
-    let mut controller = Controller::new(bus, pin_cs);
+    let mut controller = MCP2517::new(bus, pin_cs);
     controller
         .configure(
             &Configuration {
@@ -168,7 +169,7 @@ fn test_configure_mode_timeout() {
     pin_cs.expect_set_low().times(3).return_const(Ok(()));
     pin_cs.expect_set_high().times(3).return_const(Ok(()));
 
-    let mut controller = Controller::new(bus, pin_cs);
+    let mut controller = MCP2517::new(bus, pin_cs);
     assert_eq!(
         ConfigError::ConfigurationModeTimeout,
         controller.configure(&Configuration::default(), &clock).unwrap_err()
@@ -240,6 +241,113 @@ fn test_transmit_can20() {
         .times(1)
         .returning(move |data| {
             assert_eq!(payload, data);
+            Ok(&[0u8; 8])
+        })
+        .in_sequence(&mut seq);
+
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // mock setting of bits txreq and uinc
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x20, 0x69, 0x03], data);
+            Ok(&[0u8; 3])
+        })
+        .in_sequence(&mut seq);
+
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // mock reading of fifo control register
+    // 1st attempt -> txreq still set ->not all messages inside tx fifo have been transmitted
+    mocks.mock_register_read::<0x02>([0x30, 0x69], &mut seq);
+    // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
+    mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
+
+    mocks.into_controller().transmit(&tx_message_copy).unwrap();
+}
+
+#[test]
+fn test_transmit_can20_3_bytes() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    let payload: [u8; 3] = [1, 2, 3];
+    let payload_bytes = Bytes::copy_from_slice(&payload);
+
+    let msg_type = Can20::<8> {};
+
+    let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
+    let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
+    let tx_message_copy = tx_message.clone();
+
+    // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
+    mocks.mock_register_read::<0b0000_0000>([0x30, 0x6C], &mut seq);
+
+    // mock fifo status register read byte 0 (2nd attempt) -> tx fifo not full
+    mocks.mock_register_read::<0b0000_0001>([0x30, 0x6C], &mut seq);
+
+    // mock read operation status
+    mocks.mock_register_read::<0b1100_0000>([0x30, 0x2], &mut seq);
+
+    // mock fifo user address register read (reading 32 bits) --> address = 0x4A2
+    mocks.mock_read32::<0x00_00_04_A2>([0x30, 0x70], &mut seq);
+
+    // mock writing message in RAM specified by fifo user address (0x4A2)
+    // transfer cmd+tx_header
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            let mut cmd_and_header_buffer = [0u8; 10];
+            cmd_and_header_buffer[0] = 0x28;
+            cmd_and_header_buffer[1] = 0xA2;
+
+            cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
+
+            for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+                let num = BigEndian::read_u32(chunk);
+                LittleEndian::write_u32(chunk, num);
+            }
+
+            assert_eq!(cmd_and_header_buffer, data);
+            Ok(&[0u8; 10])
+        })
+        .in_sequence(&mut seq);
+
+    // transfer payload
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!(payload, data[..payload.len()]);
             Ok(&[0u8; 8])
         })
         .in_sequence(&mut seq);
@@ -389,6 +497,15 @@ fn test_transmit_can_fd() {
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
     mocks.into_controller().transmit(&tx_message_copy).unwrap();
+}
+
+#[test]
+fn test_read_fifo_invalid_payload_buffer_size() {
+    let mocks = Mocks::default();
+    let mut buff = [0u8; 3];
+
+    let result = mocks.into_controller().read_fifo(0x123, &mut buff);
+    assert_eq!(result.unwrap_err(), Error::InvalidBufferSize(3));
 }
 
 #[test]
@@ -560,7 +677,7 @@ fn test_request_mode_timeout() {
     pin_cs.expect_set_low().times(15).return_const(Ok(()));
     pin_cs.expect_set_high().times(15).return_const(Ok(()));
 
-    let mut controller = Controller::new(bus, pin_cs);
+    let mut controller = MCP2517::new(bus, pin_cs);
     assert_eq!(
         ConfigError::RequestModeTimeout,
         controller.configure(&Configuration::default(), &clock).unwrap_err()
@@ -831,8 +948,8 @@ pub(crate) struct Mocks {
 }
 
 impl Mocks {
-    pub fn into_controller(self) -> Controller<MockSPIBus, MockPin, TestClock> {
-        Controller::new(self.bus, self.pin_cs)
+    pub fn into_controller(self) -> MCP2517<MockSPIBus, MockPin, TestClock> {
+        MCP2517::new(self.bus, self.pin_cs)
     }
 
     /// Simulates a SPI transfer fault

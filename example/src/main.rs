@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![allow(static_mut_refs)]
 extern crate alloc;
 
 pub mod clock;
@@ -13,7 +14,7 @@ use core::fmt::Write;
 use embedded_can::{Id, StandardId};
 use embedded_hal::delay::DelayNs;
 use fugit::RateExtU32;
-use mcp2517::can::Controller;
+use mcp2517::can::{CanController, MCP2517};
 use mcp2517::config::{
     BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, RequestMode,
     SystemClockDivisor,
@@ -93,7 +94,7 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let mut can_controller: Controller<_, _, SystemClock> = Controller::new(spi, pin_cs);
+    let mut can_controller: MCP2517<_, _, SystemClock> = MCP2517::new(spi, pin_cs);
 
     // Setup clk config
     let clk_config = ClockConfiguration {

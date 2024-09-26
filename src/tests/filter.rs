@@ -1,3 +1,4 @@
+use crate::can::CanController;
 use crate::filter::Filter;
 use crate::tests::can::Mocks;
 use embedded_can::{ExtendedId, Id, StandardId};
