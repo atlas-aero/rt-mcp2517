@@ -22,7 +22,6 @@
 //!```
 //! ## CAN FD message construction example
 //! ```
-//!
 //!# use bytes::Bytes;
 //!# use mcp2517::message::{CanFd,TxMessage};
 //!# use embedded_can::{Id,StandardId};

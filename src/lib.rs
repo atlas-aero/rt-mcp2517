@@ -16,13 +16,13 @@
 //!## CAN TX/RX example
 //!
 //!```
-//!# use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
-//!# use mcp2517::can::{MCP2517,CanController};
-//!# use mcp2517::message::{Can20,TxMessage};
-//!# use mcp2517::filter::Filter;
-//!# use mcp2517::config::*;
-//!# use bytes::Bytes;
-//!# use embedded_can::{Id,StandardId};
+//! use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
+//! use mcp2517::can::{MCP2517,CanController};
+//! use mcp2517::message::{Can20,TxMessage};
+//! use mcp2517::filter::Filter;
+//! use mcp2517::config::*;
+//! use bytes::Bytes;
+//! use embedded_can::{Id,StandardId};
 //!
 //!let cs_pin = ExampleCSPin{};
 //!let spi_bus = ExampleSPIBus::default();
