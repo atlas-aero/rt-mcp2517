@@ -5,16 +5,16 @@
 //!
 //! ## CAN 2.0 message construction example
 //! ```
-//!use bytes::Bytes;
-//!use mcp2517::message::{Can20,TxMessage};
-//!use embedded_can::{Id,StandardId};
+//!# use bytes::Bytes;
+//!# use mcp2517::message::{Can20,TxMessage};
+//!# use embedded_can::{Id,StandardId};
 //!
 //! // Frame ID
 //! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
-//! // Set message type to CAN2.0 with 3 data bytes
+//! // Set message type to CAN2.0 with a maximum of 4 data bytes
 //! let message_type = Can20::<4>{};
-//! // Create payload buffer
-//! let payload = [1,2,3];
+//! // Create payload buffer of 3 data bytes. DLC determined by length of payload buffer.
+//! let payload = [0x1, 0x2, 0x3];
 //! // Create Bytes object
 //! let bytes = Bytes::copy_from_slice(&payload);
 //! // Create message object
@@ -23,9 +23,9 @@
 //! ## CAN FD message construction example
 //! ```
 //!
-//!use bytes::Bytes;
-//!use mcp2517::message::{CanFd,TxMessage};
-//!use embedded_can::{Id,StandardId};
+//!# use bytes::Bytes;
+//!# use mcp2517::message::{CanFd,TxMessage};
+//!# use embedded_can::{Id,StandardId};
 //!
 //! // Frame ID
 //! let message_id = Id::Standard(StandardId::new(0x123).unwrap());

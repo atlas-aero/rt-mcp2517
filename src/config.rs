@@ -2,13 +2,13 @@
 //! The [Configuration] struct provides an abstraction for configuring the CAN module registers.
 //! ## Fifo configuration
 //! The following example shows a FIFO buffer configuration. At the moment, there is one TX Fifo and one
-//! Rx Fifo. The configuration sets the max payload size of messages transmitted/received in both Fifo buffers
-//! to 8 bytes. The number of message the Rx Fifo buffer can hold is 10 while it is 32 for the Tx Fifo.
+//! RX Fifo. The configuration sets the max payload size of messages transmitted/received in both Fifo buffers
+//! to 8 bytes. The number of message the RX Fifo buffer can hold is 10 while it is 32 for the TX Fifo.
 //!
-//! The priority for the messages in the Tx Fifo are given the highest possible priority (32) and the retransmission
+//! The priority for the messages in the TX Fifo are given the highest possible priority (32) and the retransmission
 //! attemps are set to be unlimited.
 //!```
-//! use mcp2517::config::{FifoConfiguration,PayloadSize,RetransmissionAttempts};
+//!# use mcp2517::config::{FifoConfiguration,PayloadSize,RetransmissionAttempts};
 //!
 //! let fifo_config = FifoConfiguration{
 //!    pl_size: PayloadSize::EightBytes,
@@ -27,7 +27,7 @@
 //! Refer to the [datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/MCP2517FD-External-CAN-FD-Controller-with-SPI-Interface-20005688B.pdf) section 5.0
 //!
 //!```
-//! use mcp2517::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
+//!# use mcp2517::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
 //!
 //! let clock_config = ClockConfiguration{
 //!    clock_output: ClockOutputDivisor::DivideBy2,
@@ -40,7 +40,7 @@
 //! It is recommended to use a SYSCLK frequency of 20 MHz or 40 MHz for the MCP2517FD CAN chip.
 //! Based on the SYSCLK frequency used and the baud rate chosen, the CiNBTCFG regsiter values are configured.
 //!```
-//! use mcp2517::config::{BitRateConfig,CanBaudRate,SysClk};
+//!# use mcp2517::config::{BitRateConfig,CanBaudRate,SysClk};
 //!
 //! let bit_rate_config = BitRateConfig{
 //!    sys_clk: SysClk::MHz20,

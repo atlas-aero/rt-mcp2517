@@ -1,9 +1,9 @@
 //!# CAN Controller device
 //!
 //!```
-//! use mcp2517::can::MCP2517;
-//! use mcp2517::config::Configuration;
-//! use mcp2517::example::*;
+//!# use mcp2517::can::MCP2517;
+//!# use mcp2517::config::Configuration;
+//!# use mcp2517::example::*;
 //!
 //! let sys_clk = ExampleClock::default();
 //! let spi_bus = ExampleSPIBus::default();

@@ -3,8 +3,8 @@
 //! Lower index of the filter means higher priority (highest priority =0, lowest priority = 31).
 //!
 //! ```
-//! use mcp2517::filter::Filter;
-//! use embedded_can::{Id,ExtendedId};
+//!# use mcp2517::filter::Filter;
+//!# use embedded_can::{Id,ExtendedId};
 //!
 //! // ID to match
 //! let id = Id::Extended(ExtendedId::new(0xC672).unwrap());

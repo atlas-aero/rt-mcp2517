@@ -5,24 +5,24 @@
 
 //! # Library for MCP2517FD CAN controller
 //!
-//! Crate currently offer the following features:
+//! Crate currently offers the following features:
 //! * CAN2.0 and CAN FD format support
 //! * Standard and extended ID formats for CAN frames
-//! * no_std support
+//! * `no_std` support
 //!
 //!## Example
 //! For detailed example with rp-pico check [example](https://github.com/atlas-aero/rt-mcp2517/tree/main/example)
 //!
-//!## CAN Tx/Rx example
+//!## CAN TX/RX example
 //!
 //!```
-//!use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
-//!use mcp2517::can::{MCP2517,CanController};
-//!use mcp2517::message::{Can20,TxMessage};
-//!use mcp2517::filter::Filter;
-//!use mcp2517::config::*;
-//!use bytes::Bytes;
-//!use embedded_can::{Id,StandardId};
+//!# use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
+//!# use mcp2517::can::{MCP2517,CanController};
+//!# use mcp2517::message::{Can20,TxMessage};
+//!# use mcp2517::filter::Filter;
+//!# use mcp2517::config::*;
+//!# use bytes::Bytes;
+//!# use embedded_can::{Id,StandardId};
 //!
 //!let cs_pin = ExampleCSPin{};
 //!let spi_bus = ExampleSPIBus::default();
@@ -63,7 +63,7 @@
 //! // length of the payload buffer. So for a payload of 5 bytes
 //! // you can only use Can20::<8> as the message type
 //!let message_type = Can20::<8> {};
-//!let payload = [1, 2, 3, 4, 5, 6, 7, 8];
+//!let payload = [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8];
 //!let pl_bytes = Bytes::copy_from_slice(&payload);
 //!let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
 //!// Create and set filter object
@@ -76,7 +76,7 @@
 //!// Receive CAN message
 //!let result = controller.receive(&mut buff);
 //!assert!(result.is_ok());
-//!assert_eq!(buff,[1,2,3,4,5,6,7,8]);
+//!assert_eq!(buff,[0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
 //!```
 
 extern crate alloc;
