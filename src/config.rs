@@ -9,7 +9,7 @@
 //! attemps are set to be unlimited.
 //!```
 //!# use mcp2517::config::{FifoConfiguration,PayloadSize,RetransmissionAttempts};
-//!
+//!#
 //! let fifo_config = FifoConfiguration{
 //!    pl_size: PayloadSize::EightBytes,
 //!    rx_size: 10,
@@ -28,7 +28,7 @@
 //!
 //!```
 //!# use mcp2517::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
-//!
+//!#
 //! let clock_config = ClockConfiguration{
 //!    clock_output: ClockOutputDivisor::DivideBy2,
 //!    system_clock: SystemClockDivisor::DivideBy1,
@@ -41,7 +41,7 @@
 //! Based on the SYSCLK frequency used and the baud rate chosen, the CiNBTCFG regsiter values are configured.
 //!```
 //!# use mcp2517::config::{BitRateConfig,CanBaudRate,SysClk};
-//!
+//!#
 //! let bit_rate_config = BitRateConfig{
 //!    sys_clk: SysClk::MHz20,
 //!    can_speed: CanBaudRate::Kpbs500

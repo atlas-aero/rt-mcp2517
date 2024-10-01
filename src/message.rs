@@ -8,7 +8,7 @@
 //!# use bytes::Bytes;
 //!# use mcp2517::message::{Can20,TxMessage};
 //!# use embedded_can::{Id,StandardId};
-//!
+//!#
 //! // Frame ID
 //! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
 //! // Set message type to CAN2.0 with a maximum of 4 data bytes
@@ -26,7 +26,7 @@
 //!# use bytes::Bytes;
 //!# use mcp2517::message::{CanFd,TxMessage};
 //!# use embedded_can::{Id,StandardId};
-//!
+//!#
 //! // Frame ID
 //! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
 //! // Set message type to CANfd with a max of 24 data bytes with bit rate switch enabled

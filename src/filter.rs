@@ -5,7 +5,7 @@
 //! ```
 //!# use mcp2517::filter::Filter;
 //!# use embedded_can::{Id,ExtendedId};
-//!
+//!#
 //! // ID to match
 //! let id = Id::Extended(ExtendedId::new(0xC672).unwrap());
 //! // Create filter with index 2
