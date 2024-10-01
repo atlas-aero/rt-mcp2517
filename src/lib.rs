@@ -83,14 +83,13 @@ extern crate alloc;
 
 pub mod can;
 pub mod config;
-pub mod status;
-
+#[cfg(feature = "example")]
+pub mod example;
 pub mod filter;
 pub mod message;
-
-pub mod example;
 #[cfg(test)]
 pub(crate) mod mocks;
 mod registers;
+pub mod status;
 #[cfg(test)]
 mod tests;
