@@ -192,10 +192,10 @@ fn test_transmit_can20() {
     let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
     let tx_message_copy = tx_message.clone();
 
-    // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
+    // mock fifo status register read byte 0 (1st attempt) -> TX fifo full
     mocks.mock_register_read::<0b0000_0000>([0x30, 0x6C], &mut seq);
 
-    // mock fifo status register read byte 0 (2nd attempt) -> tx fifo not full
+    // mock fifo status register read byte 0 (2nd attempt) -> TX fifo not full
     mocks.mock_register_read::<0b0000_0001>([0x30, 0x6C], &mut seq);
 
     // mock read operation status
@@ -561,7 +561,7 @@ fn test_receive() {
         .return_const(Ok(()))
         .in_sequence(&mut seq);
 
-    // set uinc bit in Rx FIFO control register
+    // set uinc bit in RX FIFO control register
     mocks
         .pin_cs
         .expect_set_low()

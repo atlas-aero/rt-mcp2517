@@ -1,3 +1,23 @@
+//!# CAN Controller device
+//!
+//!```
+//!# use mcp2517::can::MCP2517;
+//!# use mcp2517::config::Configuration;
+//!# use mcp2517::example::*;
+//!#
+//! let sys_clk = ExampleClock::default();
+//! let spi_bus = ExampleSPIBus::default();
+//! let cs_pin = ExampleCSPin{};
+//!
+//! // Initialize controller object
+//! let mut can_controller = MCP2517::new(spi_bus,cs_pin);
+//!
+//! // Use default configuration settings
+//! let can_config = Configuration::default();
+//!
+//! // Configure CAN controller
+//! can_controller.configure(&can_config, &sys_clk).unwrap();
+//! ```
 use crate::can::BusError::{CSError, TransferError};
 use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
 use crate::config::{ClockConfiguration, Configuration};
@@ -249,6 +269,14 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
         Ok(())
     }
 
+    /// Disable corresponding filter
+    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+        let filter_reg = Self::filter_control_register_byte(filter_index);
+        self.write_register(filter_reg, 0x00)?;
+
+        Ok(())
+    }
+
     /// Reads and returns the operation status
     pub fn read_operation_status(&mut self) -> Result<OperationStatus, BusError<B::Error, CS::Error>> {
         let data = self.read_register(REGISTER_C1CON + 2)?;
@@ -308,14 +336,6 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
 
         // Set FLTENm to enable filter
         self.write_register(filter_control_reg, (1 << 7) | fifo_index)?;
-
-        Ok(())
-    }
-
-    /// Disable corresponding filter
-    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
-        let filter_reg = Self::filter_control_register_byte(filter_index);
-        self.write_register(filter_reg, 0x00)?;
 
         Ok(())
     }
