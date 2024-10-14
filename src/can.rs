@@ -99,7 +99,7 @@ pub trait CanController {
     type Error;
 
     /// Transmit CAN message
-    /// * `blocking`: if true, function blocks until TX fifo buffer is empty
+    /// * `blocking`: if true, function blocks until TX fifo buffer is empty and till TXREQ bit is cleared
     fn transmit<const L: usize, T: MessageType<L>>(
         &mut self,
         message: &TxMessage<T, L>,
