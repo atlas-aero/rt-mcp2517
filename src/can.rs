@@ -124,10 +124,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         let fifo_status_reg = Self::fifo_status_register(FIFO_TX_INDEX);
 
         // Check if TX fifo is full
-        if blocking {
-            while !self.fifo_not_full(fifo_status_reg)? {}
-        } else if !self.fifo_not_full(fifo_status_reg)? {
-            return Err(Error::TxFifoFullErr);
+        while !self.fifo_not_full(fifo_status_reg)? {
+            if !blocking {
+                return Err(Error::TxFifoFullErr);
+            }
         }
 
         // make sure length of payload is consistent with CAN operation mode
@@ -165,10 +165,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
 
         // Make sure RX fifo is not empty
-        if blocking {
-            while !self.fifo_not_empty(fifo_status_reg)? {}
-        } else if !self.fifo_not_empty(fifo_status_reg)? {
-            return Err(Error::RxFifoEmptyErr);
+        while !self.fifo_not_empty(fifo_status_reg)? {
+            if !blocking {
+                return Err(Error::RxFifoEmptyErr);
+            }
         }
 
         let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
