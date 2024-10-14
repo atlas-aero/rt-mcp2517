@@ -64,10 +64,10 @@ pub enum Error<B, CS> {
     InvalidRamAddress(u16),
     /// Payload buffer length not a multiple of 4 bytes
     InvalidBufferSize(usize),
-    /// RX Fifo buffer is empty
-    RxFifoEmpty,
-    /// TX fifo buffer is full
-    TxFifoFull,
+    /// RX fifo empty error
+    RxFifoEmptyErr,
+    /// TX fifo buffer full error
+    TxFifoFullErr,
 }
 
 impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
@@ -127,7 +127,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         if blocking {
             while !self.fifo_not_full(fifo_status_reg)? {}
         } else if !self.fifo_not_full(fifo_status_reg)? {
-            return Err(Error::TxFifoFull);
+            return Err(Error::TxFifoFullErr);
         }
 
         // make sure length of payload is consistent with CAN operation mode
@@ -168,7 +168,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         if blocking {
             while !self.fifo_not_empty(fifo_status_reg)? {}
         } else if !self.fifo_not_empty(fifo_status_reg)? {
-            return Err(Error::RxFifoEmpty);
+            return Err(Error::RxFifoEmptyErr);
         }
 
         let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;

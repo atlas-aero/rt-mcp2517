@@ -604,7 +604,7 @@ fn test_receive_fifo_empty() {
 
     let result = mocks.into_controller().receive(&mut message_buff, false);
 
-    assert_eq!(result.unwrap_err(), Error::RxFifoEmpty);
+    assert_eq!(result.unwrap_err(), Error::RxFifoEmptyErr);
 }
 
 #[test]
@@ -624,7 +624,7 @@ fn test_transmit_fifo_full() {
 
     let res = mocks.into_controller().transmit(&tx_message, false);
 
-    assert_eq!(res.unwrap_err(), Error::TxFifoFull);
+    assert_eq!(res.unwrap_err(), Error::TxFifoFullErr);
 }
 
 #[test]
