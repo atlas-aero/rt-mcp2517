@@ -1,3 +1,4 @@
+/// This code can be disabled by disabling the `example` feature
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
