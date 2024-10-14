@@ -283,7 +283,7 @@ fn test_transmit_can20() {
     // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
-    mocks.into_controller().transmit(&tx_message_copy).unwrap();
+    mocks.into_controller().transmit(&tx_message_copy, true).unwrap();
 }
 
 #[test]
@@ -390,7 +390,7 @@ fn test_transmit_can20_3_bytes() {
     // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
-    mocks.into_controller().transmit(&tx_message_copy).unwrap();
+    mocks.into_controller().transmit(&tx_message_copy, true).unwrap();
 }
 
 #[test]
@@ -496,7 +496,7 @@ fn test_transmit_can_fd() {
     // 2nd attempt -> txreq cleared -> all messages inside tx fifo have been transmitted
     mocks.mock_register_read::<0x00>([0x30, 0x69], &mut seq);
 
-    mocks.into_controller().transmit(&tx_message_copy).unwrap();
+    mocks.into_controller().transmit(&tx_message_copy, true).unwrap();
 }
 
 #[test]
@@ -584,11 +584,47 @@ fn test_receive() {
         .return_const(Ok(()))
         .in_sequence(&mut seq);
 
-    let result = mocks.into_controller().receive(&mut message_buff);
+    let result = mocks.into_controller().receive(&mut message_buff, true);
 
     assert!(result.is_ok());
 
     assert_eq!(message_buff, [1, 2, 3, 4, 5, 6, 7, 8]);
+}
+
+#[test]
+fn test_receive_fifo_empty() {
+    let mut mocks = Mocks::default();
+
+    let mut seq = Sequence::new();
+
+    let mut message_buff = [0u8; 8];
+
+    // status register read (fifo not empty flag is not set)
+    mocks.mock_register_read::<0b0000_0000>([0x30, 0x60], &mut seq);
+
+    let result = mocks.into_controller().receive(&mut message_buff, false);
+
+    assert_eq!(result.unwrap_err(), Error::RxFifoEmpty);
+}
+
+#[test]
+fn test_transmit_fifo_full() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    let payload: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+    let payload_bytes = Bytes::copy_from_slice(&payload);
+
+    let msg_type = Can20::<8> {};
+
+    let identifier = ExtendedId::new(EXTENDED_ID).unwrap();
+    let tx_message = TxMessage::new(msg_type, payload_bytes, Id::Extended(identifier)).unwrap();
+
+    // mock fifo status register read byte 0 (1st attempt) -> tx fifo full
+    mocks.mock_register_read::<0b0000_0000>([0x30, 0x6C], &mut seq);
+
+    let res = mocks.into_controller().transmit(&tx_message, false);
+
+    assert_eq!(res.unwrap_err(), Error::TxFifoFull);
 }
 
 #[test]
