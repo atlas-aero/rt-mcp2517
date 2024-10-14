@@ -124,7 +124,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         let fifo_status_reg = Self::fifo_status_register(FIFO_TX_INDEX);
 
         // Check if TX fifo is full
-        while !self.fifo_not_full(fifo_status_reg)? {
+        while !self.fifo_tfnrfnif(fifo_status_reg)? {
             if !blocking {
                 return Err(Error::TxFifoFullErr);
             }
@@ -165,7 +165,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
 
         // Make sure RX fifo is not empty
-        while !self.fifo_not_empty(fifo_status_reg)? {
+        while !self.fifo_tfnrfnif(fifo_status_reg)? {
             if !blocking {
                 return Err(Error::RxFifoEmptyErr);
             }
@@ -479,23 +479,12 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
         buffer
     }
 
-    /// Returns true if TX fifo is not full
-    fn fifo_not_full(&mut self, fifo_reg_addr: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
+    /// Returns if the TX/RX fifo not full/empty flag is set
+    fn fifo_tfnrfnif(&mut self, fifo_reg_addr: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
         let txfifo_status_byte0 = self.read_register(fifo_reg_addr)?;
         let txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
 
         if txfifo_status_reg0.tfnrfnif() {
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// Returns true if RX fifo is not empty
-    fn fifo_not_empty(&mut self, fifo_reg_addr: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
-        let rxfifo_status_byte0 = self.read_register(fifo_reg_addr)?;
-        let rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
-
-        if rxfifo_status_reg0.tfnrfnif() {
             return Ok(true);
         }
         Ok(false)
