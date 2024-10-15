@@ -1,4 +1,6 @@
-/// This code can be disabled by disabling the `example` feature
+//! # Mock dummy structure for doc examples
+//!
+//! This code can be removed by disabling the `example` feature
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
