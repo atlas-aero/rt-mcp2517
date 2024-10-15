@@ -122,12 +122,14 @@ fn main() -> ! {
     let can_id = Id::Standard(StandardId::new(0x55).unwrap());
 
     // Create filter object for RX
-    let filter = Filter::new(can_id, 0).unwrap();
+    let mut filter = Filter::new(can_id, 0).unwrap();
+    // Set mask to match if only 2 LSB of ID match with filter
+    filter.set_mask_standard_id(0xFF);
     let _ = can_controller.set_filter_object(filter);
 
     // Create message frame
     let message_type = Can20::<8> {};
-    let payload = [1, 2, 3, 4, 5, 6, 7, 8];
+    let payload = [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8];
     let pl_bytes = Bytes::copy_from_slice(&payload);
     let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
 

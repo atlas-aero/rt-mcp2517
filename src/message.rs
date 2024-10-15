@@ -1,3 +1,43 @@
+//!# CAN Message
+//! This library supports both CAN2.0 (up to 8 data bytes per CAN Frame)
+//! and CAN FD (up to 64 data bytes per CAN frame)
+//! formats with both standard and extended frame ID formats
+//!
+//! ## CAN 2.0 message construction example
+//! ```
+//!# use bytes::Bytes;
+//!# use mcp2517::message::{Can20,TxMessage};
+//!# use embedded_can::{Id,StandardId};
+//!#
+//! // Frame ID
+//! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
+//! // Set message type to CAN2.0 with a maximum of 4 data bytes
+//! let message_type = Can20::<4>{};
+//! // Create payload buffer of 3 data bytes. DLC determined by length of payload buffer.
+//! let payload = [0x1, 0x2, 0x3];
+//! // Create Bytes object
+//! let bytes = Bytes::copy_from_slice(&payload);
+//! // Create message object
+//! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
+//!```
+//! ## CAN FD message construction example
+//! ```
+//!# use bytes::Bytes;
+//!# use mcp2517::message::{CanFd,TxMessage};
+//!# use embedded_can::{Id,StandardId};
+//!#
+//! // Frame ID
+//! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
+//! // Set message type to CANfd with a max of 24 data bytes with bit rate switch enabled
+//! let message_type = CanFd::<24>{bitrate_switch: true};
+//! // Create payload buffer with 22 data bytes (here DLC will be 24 because 22 is not a supported DLC code)
+//! let payload = [0u8;22];
+//! // Create Bytes object
+//! let bytes = Bytes::copy_from_slice(&payload);
+//! // Create message object
+//! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
+//! ```
+
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;
