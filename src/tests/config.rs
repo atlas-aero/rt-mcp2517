@@ -1,6 +1,8 @@
 use crate::config::{
-    ClockConfiguration, ClockOutputDivisor, FifoConfiguration, PLLSetting, RetransmissionAttempts, SystemClockDivisor,
+    BitRateConfig, ClockConfiguration, ClockOutputDivisor, FifoConfiguration, PLLSetting, RetransmissionAttempts,
+    SystemClockDivisor,
 };
+use crate::registers::C1NBTCFG;
 
 #[test]
 fn test_clock_from_register() {
@@ -94,14 +96,14 @@ fn test_clock_configuration_to_register() {
 
 #[test]
 fn test_fifo_configuration_as_rx_register() {
-    assert_eq!(0b0000_0000, fifo_rx_config(0).as_rx_register());
-    assert_eq!(0b0000_0000, fifo_rx_config(1).as_rx_register());
+    assert_eq!(0b0000_0000, fifo_rx_config(0).as_rx_register_3());
+    assert_eq!(0b0000_0000, fifo_rx_config(1).as_rx_register_3());
 
-    assert_eq!(0b0000_0001, fifo_rx_config(2).as_rx_register());
-    assert_eq!(0b0000_1011, fifo_rx_config(12).as_rx_register());
+    assert_eq!(0b0000_0001, fifo_rx_config(2).as_rx_register_3());
+    assert_eq!(0b0000_1011, fifo_rx_config(12).as_rx_register_3());
 
-    assert_eq!(0b0001_1111, fifo_rx_config(32).as_rx_register());
-    assert_eq!(0b0001_1111, fifo_rx_config(33).as_rx_register());
+    assert_eq!(0b0001_1111, fifo_rx_config(32).as_rx_register_3());
+    assert_eq!(0b0001_1111, fifo_rx_config(33).as_rx_register_3());
 }
 
 #[test]
@@ -182,6 +184,16 @@ fn test_fifo_configuration_as_tx_register_0() {
         }
         .as_tx_register_0()
     );
+}
+
+#[test]
+fn test_bit_timing_config_correct() {
+    let config = BitRateConfig::default();
+    let reg = C1NBTCFG::from_bytes(config.calculate_values());
+    assert_eq!(reg.brp(), 0x00);
+    assert_eq!(reg.tseg1(), 62);
+    assert_eq!(reg.tseg2(), 15);
+    assert_eq!(reg.sjw(), 1);
 }
 
 fn fifo_rx_config(rx_size: u8) -> FifoConfiguration {

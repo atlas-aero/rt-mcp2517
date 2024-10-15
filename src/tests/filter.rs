@@ -1,3 +1,4 @@
+use crate::can::CanController;
 use crate::filter::Filter;
 use crate::tests::can::Mocks;
 use embedded_can::{ExtendedId, Id, StandardId};
@@ -90,6 +91,29 @@ fn test_set_filter_object_standard_id() {
         .return_const(Ok(()))
         .in_sequence(&mut seq);
 
+    // enable filter
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x21, 0xD1, 0x81], data);
+            Ok(&[0u8; 6])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
     let result = mocks.into_controller().set_filter_object(filter);
 
     assert!(result.is_ok());
@@ -166,6 +190,29 @@ fn test_set_filter_object_extended_id() {
         .times(1)
         .returning(move |data| {
             assert_eq!([0x21, 0xF4, 0u8, 0x6, 0u8, 0u8], data);
+            Ok(&[0u8; 6])
+        })
+        .in_sequence(&mut seq);
+    mocks
+        .pin_cs
+        .expect_set_high()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+
+    // enable filter
+    mocks
+        .pin_cs
+        .expect_set_low()
+        .times(1)
+        .return_const(Ok(()))
+        .in_sequence(&mut seq);
+    mocks
+        .bus
+        .expect_transfer()
+        .times(1)
+        .returning(move |data| {
+            assert_eq!([0x21, 0xD0, 0x81], data);
             Ok(&[0u8; 6])
         })
         .in_sequence(&mut seq);

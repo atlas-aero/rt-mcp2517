@@ -1,3 +1,43 @@
+//!# CAN Message
+//! This library supports both CAN2.0 (up to 8 data bytes per CAN Frame)
+//! and CAN FD (up to 64 data bytes per CAN frame)
+//! formats with both standard and extended frame ID formats
+//!
+//! ## CAN 2.0 message construction example
+//! ```
+//!# use bytes::Bytes;
+//!# use mcp2517::message::{Can20,TxMessage};
+//!# use embedded_can::{Id,StandardId};
+//!#
+//! // Frame ID
+//! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
+//! // Set message type to CAN2.0 with a maximum of 4 data bytes
+//! let message_type = Can20::<4>{};
+//! // Create payload buffer of 3 data bytes. DLC determined by length of payload buffer.
+//! let payload = [0x1, 0x2, 0x3];
+//! // Create Bytes object
+//! let bytes = Bytes::copy_from_slice(&payload);
+//! // Create message object
+//! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
+//!```
+//! ## CAN FD message construction example
+//! ```
+//!# use bytes::Bytes;
+//!# use mcp2517::message::{CanFd,TxMessage};
+//!# use embedded_can::{Id,StandardId};
+//!#
+//! // Frame ID
+//! let message_id = Id::Standard(StandardId::new(0x123).unwrap());
+//! // Set message type to CANfd with a max of 24 data bytes with bit rate switch enabled
+//! let message_type = CanFd::<24>{bitrate_switch: true};
+//! // Create payload buffer with 22 data bytes (here DLC will be 24 because 22 is not a supported DLC code)
+//! let payload = [0u8;22];
+//! // Create Bytes object
+//! let bytes = Bytes::copy_from_slice(&payload);
+//! // Create message object
+//! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
+//! ```
+
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
 use log::debug;
@@ -34,14 +74,17 @@ pub enum DLC {
     SixtyFour,
 }
 
-/// Invalid data length code error
+/// Possible errors when creating a [TxMessage] object
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum DLCError {
+pub enum MessageError {
+    /// Payload length invalid
     InvalidLength(usize),
+    /// Message type Length argument not divisble by 4
+    InvalidTypeSize(usize),
 }
 
 impl DLC {
-    fn from_length(value: usize) -> Result<Self, DLCError> {
+    fn from_length(value: usize) -> Result<Self, MessageError> {
         match value {
             0 => Ok(Self::Zero),
             1 => Ok(Self::One),
@@ -59,7 +102,7 @@ impl DLC {
             32 => Ok(Self::ThirtyTwo),
             48 => Ok(Self::FortyEight),
             64 => Ok(Self::SixtyFour),
-            val => Err(DLCError::InvalidLength(val)),
+            val => Err(MessageError::InvalidLength(val)),
         }
     }
 }
@@ -96,38 +139,71 @@ pub struct TxHeader {
     pub data_length_code: DLC,
 }
 
-/// CAN 2.0 message type
-#[derive(Debug, Copy, Clone)]
-pub struct Can20 {}
+pub trait MessageType<const L: usize> {
+    /// Setup CAN message header depending on message type
+    fn setup_header(&self, header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError>;
+}
 
-impl MessageType<8> for Can20 {
-    fn setup_header(&self, _header: &mut TxHeader) -> Result<(), DLCError> {
+/// CAN 2.0 message type where `L` is the max number of payload bytes.
+/// For CAN2.0, `L` can either be 4 or 8.
+#[derive(Debug, Copy, Clone)]
+pub struct Can20<const L: usize> {}
+
+impl<const L: usize> MessageType<L> for Can20<L> {
+    fn setup_header(&self, _header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError> {
+        if L > 8 || payload_length > 8 {
+            let max = payload_length.max(L);
+            debug!("Maximum of 64 bytes allowed. Current size: {max} bytes");
+            return Err(MessageError::InvalidLength(max));
+        }
+
+        if payload_length > L {
+            debug!("Payload length {payload_length} must be less than or equal {L}");
+            return Err(MessageError::InvalidLength(payload_length));
+        }
+
+        if L % 4 != 0 {
+            debug!("CAN2.0 generic argument must be 4 or 8");
+            return Err(MessageError::InvalidTypeSize(L));
+        }
+
         Ok(())
     }
 }
-
-/// CAN FD message type
+/// CAN FD message type where `L` is the max number of payload bytes.
+/// `L` must be a multiple of 4 and `L` >= actual payload length in bytes
 #[derive(Debug, Copy, Clone)]
-pub struct CanFd {
+pub struct CanFd<const L: usize> {
     pub bitrate_switch: bool,
 }
 
-impl MessageType<64> for CanFd {
-    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError> {
+impl<const L: usize> MessageType<L> for CanFd<L> {
+    fn setup_header(&self, header: &mut TxHeader, payload_length: usize) -> Result<(), MessageError> {
+        if L > 64 || payload_length > 64 {
+            let max = payload_length.max(L);
+            debug!("Maximum of 64 bytes allowed. Current size: {max} bytes");
+            return Err(MessageError::InvalidLength(max));
+        }
+
+        if payload_length > L {
+            debug!("Payload length {payload_length} must be less than or equal {L}");
+            return Err(MessageError::InvalidLength(payload_length));
+        }
+
+        if L % 4 != 0 {
+            debug!("CANFD generic argument must be a multiple of 4");
+            return Err(MessageError::InvalidTypeSize(L));
+        }
+
         header.set_bit_rate_switch(self.bitrate_switch);
         header.set_fd_frame(true);
         Ok(())
     }
 }
 
-pub trait MessageType<const MAX_LENGTH: usize> {
-    /// Setup CAN message header depending on message type
-    fn setup_header(&self, header: &mut TxHeader) -> Result<(), DLCError>;
-}
-
 /// Transmit Message Object
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct TxMessage<T, const MAX_LENGTH: usize> {
+pub struct TxMessage<T: MessageType<L>, const L: usize> {
     /// first 2 bytes of Transmit Message Object
     pub(crate) header: TxHeader,
     /// Payload bytes of Message Object
@@ -136,21 +212,17 @@ pub struct TxMessage<T, const MAX_LENGTH: usize> {
     pub(crate) message_type: T,
 }
 
-impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGTH> {
-    pub fn new(message_type: T, data: Bytes, identifier: Id) -> Result<Self, DLCError> {
+impl<T: MessageType<L>, const L: usize> TxMessage<T, L> {
+    /// Create new CAN message
+    pub fn new(message_type: T, data: Bytes, identifier: Id) -> Result<Self, MessageError> {
         let mut header = TxHeader::new();
 
         let mut payload_length = data.len();
 
-        if payload_length > MAX_LENGTH {
-            debug!("Maximum of {MAX_LENGTH} bytes allowed. Current size: {payload_length} bytes");
-            return Err(DLCError::InvalidLength(payload_length));
-        }
-
-        message_type.setup_header(&mut header)?;
+        message_type.setup_header(&mut header, payload_length)?;
 
         // length used to choose the next supported DLC
-        while let Err(DLCError::InvalidLength(_)) = DLC::from_length(payload_length) {
+        while let Err(MessageError::InvalidLength(_)) = DLC::from_length(payload_length) {
             payload_length += 1;
         }
 
@@ -170,6 +242,16 @@ impl<T: MessageType<MAX_LENGTH>, const MAX_LENGTH: usize> TxMessage<T, MAX_LENGT
             buff: data,
             message_type,
         })
+    }
+
+    /// Returns payload as a `&[u8]`
+    pub fn get_payload(&self) -> &[u8] {
+        self.buff.as_ref()
+    }
+
+    /// Returns Header register of Transmit Message Object
+    pub fn get_header(&self) -> &TxHeader {
+        &self.header
     }
 }
 

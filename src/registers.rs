@@ -137,7 +137,7 @@ pub struct FilterObjectReg {
     __: B1,
     /// Extended ID enable bit
     /// If MIDE 1, setting this bit matches Extended ID only
-    /// if MIDE 1, clearing this bit matches Standard ID only
+    /// If MIDE 0, clearing this bit matches Standard ID only
     pub exide: bool,
     /// Standard ID filter bit
     pub sid11: bool,
@@ -145,4 +145,23 @@ pub struct FilterObjectReg {
     pub eid: B18,
     /// Standard ID filter rbits
     pub sid: B11,
+}
+
+/// Nominal bit time configuration register
+#[bitfield]
+#[derive(Default, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub struct C1NBTCFG {
+    /// Baud rate prescalar bits
+    pub brp: B8,
+    /// Time Segment 1 bits (Propagation Segment + Phase Segment 1)
+    pub tseg1: B8,
+    #[skip]
+    __: B1,
+    /// Time Segment 2 bits (Phase Segment 2)
+    pub tseg2: B7,
+    #[skip]
+    __: B1,
+    /// Synchronization Jump Width bits
+    pub sjw: B7,
 }

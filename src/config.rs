@@ -1,3 +1,53 @@
+//! # CAN Module configuration
+//! The [Configuration] struct provides an abstraction for configuring the CAN module registers.
+//! ## Fifo configuration
+//! The following example shows a FIFO buffer configuration. At the moment, there is one TX Fifo and one
+//! RX Fifo. The configuration sets the max payload size of messages transmitted/received in both Fifo buffers
+//! to 8 bytes. The number of message the RX Fifo buffer can hold is 10 while it is 32 for the TX Fifo.
+//!
+//! The priority for the messages in the TX Fifo are given the highest possible priority (32) and the retransmission
+//! attemps are set to be unlimited.
+//!```
+//!# use mcp2517::config::{FifoConfiguration,PayloadSize,RetransmissionAttempts};
+//!#
+//! let fifo_config = FifoConfiguration{
+//!    pl_size: PayloadSize::EightBytes,
+//!    rx_size: 10,
+//!    tx_attempts: RetransmissionAttempts::Unlimited,
+//!    tx_enable: true,
+//!    tx_priority: 32,
+//!    tx_size: 32,
+//! };
+//!```
+//! ## Clock configuration
+//! The CAN system clock is determined through setting the `system_clock` and `pll`. In this example,
+//! the pll setting used is to directly use the crystal oscillator without any multiplication, and the
+//! `system_clock` divisor is set to 1. Meaning the frequency of the SYSCLK matches the crystal used.
+//! The `clock_output` divisior is set to 2. So that the CLKO outputs half the freq of the crystal.
+//! Refer to the [datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/MCP2517FD-External-CAN-FD-Controller-with-SPI-Interface-20005688B.pdf) section 5.0
+//!
+//!```
+//!# use mcp2517::config::{ClockConfiguration, ClockOutputDivisor, PLLSetting, SystemClockDivisor};
+//!#
+//! let clock_config = ClockConfiguration{
+//!    clock_output: ClockOutputDivisor::DivideBy2,
+//!    system_clock: SystemClockDivisor::DivideBy1,
+//!    pll: PLLSetting::DirectXTALOscillator,
+//!    disable_clock: false,
+//! };
+//!```
+//! ## Bit rate configuration
+//! It is recommended to use a SYSCLK frequency of 20 MHz or 40 MHz for the MCP2517FD CAN chip.
+//! Based on the SYSCLK frequency used and the baud rate chosen, the CiNBTCFG regsiter values are configured.
+//!```
+//!# use mcp2517::config::{BitRateConfig,CanBaudRate,SysClk};
+//!#
+//! let bit_rate_config = BitRateConfig{
+//!    sys_clk: SysClk::MHz20,
+//!    can_speed: CanBaudRate::Kpbs500
+//! };
+//!
+//!
 use crate::status::OperationMode;
 
 /// Entire configuration currently supported
@@ -11,6 +61,9 @@ pub struct Configuration {
 
     /// Target request/operation mode
     pub mode: RequestMode,
+
+    /// Bit rate config
+    pub bit_rate: BitRateConfig,
 }
 
 /// Oscillator/Clock configuration
@@ -182,13 +235,15 @@ impl Default for FifoConfiguration {
 }
 
 impl FifoConfiguration {
-    /// Encodes the configuration to RX FIFO configuration register byte
-    pub(crate) fn as_rx_register(&self) -> u8 {
+    /// Encodes the configuration for the third RX fifo control register byte
+    pub(crate) fn as_rx_register_3(&self) -> u8 {
         (Self::limit_size(self.rx_size) - 1) | ((self.pl_size as u8) << 5)
     }
 
     /// Encodes the configuration for the first TX configuration register byte
     pub(crate) fn as_tx_register_0(&self) -> u8 {
+        // bit 7 -> tx enable
+        // bit 0 -> tx fifo not full interrupt flag enable
         match self.tx_enable {
             true => 0b1000_0000,
             false => 0b0000_0000,
@@ -234,6 +289,8 @@ pub enum RequestMode {
     InternalLoopback,
     /// External loop back mode
     ExternalLoopback,
+    /// Listen only mode
+    ListenOnly,
     /// CAN 2.0 mode, possible error frames on CAN FD frames
     NormalCAN2_0,
 }
@@ -250,7 +307,74 @@ impl RequestMode {
             RequestMode::NormalCANFD => OperationMode::NormalCANFD,
             RequestMode::InternalLoopback => OperationMode::InternalLoopback,
             RequestMode::ExternalLoopback => OperationMode::ExternalLoopback,
+            RequestMode::ListenOnly => OperationMode::ListenOnly,
             RequestMode::NormalCAN2_0 => OperationMode::NormalCAN2_0,
+        }
+    }
+}
+
+/// MCP2517FD clock speed
+#[derive(Copy, Debug, Clone)]
+pub enum SysClk {
+    /// Chip SYSCLK is 20 Mhz
+    MHz20,
+    /// Chip SYSCLK is 40 Mhz
+    Mhz40,
+}
+
+/// CAN bus baud rate
+#[derive(Copy, Debug, Clone)]
+pub enum CanBaudRate {
+    /// 1000 kilo bits per second
+    Kbps1000,
+    /// 500 kilo bits per second
+    Kpbs500,
+    /// 250 kilo bits per second
+    Kbps250,
+    /// 125 kilo bits per second
+    Kbps125,
+    /// 50 kilo bits per second
+    Kbps50,
+    /// 10 kilo bits per second
+    Kbps10,
+    /// 5 kilo bits per second
+    Kbps5,
+}
+
+/// Bit rate config
+#[derive(Clone, Debug)]
+pub struct BitRateConfig {
+    /// Operating speed of chip : SYSCLK
+    pub sys_clk: SysClk,
+    /// CAN Baud rate
+    pub can_speed: CanBaudRate,
+}
+
+impl BitRateConfig {
+    /// Calculate CiNBTCFG register values based on SYSCLK and desired baud rate
+    /// using this bit time calculations [Excel sheet](https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DesignChecklist/MCP2517FD+Bit+Time+Calculations+-+UG.xlsx)
+    pub fn calculate_values(&self) -> [u8; 4] {
+        match (self.sys_clk, self.can_speed) {
+            (SysClk::MHz20, CanBaudRate::Kbps1000) => [0, 13, 4, 1],
+            (SysClk::MHz20, CanBaudRate::Kpbs500) | (SysClk::Mhz40, CanBaudRate::Kbps1000) => [0, 30, 7, 1],
+            (SysClk::MHz20, CanBaudRate::Kbps250) | (SysClk::Mhz40, CanBaudRate::Kpbs500) => [0, 62, 15, 1],
+            (SysClk::MHz20, CanBaudRate::Kbps125) | (SysClk::Mhz40, CanBaudRate::Kbps250) => [0, 126, 31, 1],
+            (SysClk::MHz20, CanBaudRate::Kbps50)
+            | (SysClk::MHz20, CanBaudRate::Kbps10)
+            | (SysClk::MHz20, CanBaudRate::Kbps5)
+            | (SysClk::Mhz40, CanBaudRate::Kbps125)
+            | (SysClk::Mhz40, CanBaudRate::Kbps50)
+            | (SysClk::Mhz40, CanBaudRate::Kbps10)
+            | (SysClk::Mhz40, CanBaudRate::Kbps5) => [0, 255, 63, 1],
+        }
+    }
+}
+
+impl Default for BitRateConfig {
+    fn default() -> Self {
+        Self {
+            sys_clk: SysClk::MHz20,
+            can_speed: CanBaudRate::Kbps250,
         }
     }
 }
