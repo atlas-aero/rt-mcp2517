@@ -1,3 +1,5 @@
+//! # Mapped status registers
+
 ///  Operation status read from C1CON register
 #[derive(Copy, Clone, Debug)]
 pub struct OperationStatus {
