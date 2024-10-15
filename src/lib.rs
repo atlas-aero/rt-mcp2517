@@ -73,12 +73,12 @@
 //!let filter = Filter::new(can_id, 0).unwrap();
 //!let _ = controller.set_filter_object(filter);
 //!
-//!// Transmit CAN message
-//!controller.transmit(&can_message).unwrap();
+//!// Transmit CAN message in blocking mode
+//!controller.transmit(&can_message,true).unwrap();
 //!
-//!// Receive CAN message
+//!// Receive CAN message in blocking mode
 //!let mut buff = [0u8;8];
-//!let result = controller.receive(&mut buff);
+//!let result = controller.receive(&mut buff,true);
 //!assert!(result.is_ok());
 //!assert_eq!(buff,[0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
 //!```
