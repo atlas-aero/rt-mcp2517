@@ -12,7 +12,7 @@ Crate currently offers the following features:
 
 ## Example
 
-````Rust
+````rust
 use mcp2517::example::{ExampleClock, ExampleCSPin, ExampleSPIBus};
 use mcp2517::can::{MCP2517, CanController};
 use mcp2517::message::{Can20, TxMessage};
