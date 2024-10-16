@@ -1,4 +1,8 @@
 # rt-mcp2517
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Crates.io](https://img.shields.io/crates/v/mcp2517.svg)](https://crates.io/crates/mcp2517)
+[![Actions Status](https://github.com/atlas-aero/rt-mcp2517/workflows/QA/badge.svg)](http://github.com/pegasus-aero/rt-mcp2517/actions)
 
 Rust no_std library
 for [MCP2517FD](https://ww1.microchip.com/downloads/en/DeviceDoc/MCP2517FD-External-CAN-FD-Controller-with-SPI-Interface-20005688B.pdf)
