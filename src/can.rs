@@ -84,6 +84,10 @@ pub enum Error<B, CS> {
     InvalidRamAddress(u16),
     /// Payload buffer length not a multiple of 4 bytes
     InvalidBufferSize(usize),
+    /// RX fifo empty error
+    RxFifoEmptyErr,
+    /// TX fifo buffer full error
+    TxFifoFullErr,
 }
 
 impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
@@ -115,10 +119,16 @@ pub trait CanController {
     type Error;
 
     /// Transmit CAN message
-    fn transmit<const L: usize, T: MessageType<L>>(&mut self, message: &TxMessage<T, L>) -> Result<(), Self::Error>;
+    /// * `blocking`: if true, function blocks until TX fifo buffer is empty and till TXREQ bit is cleared
+    fn transmit<const L: usize, T: MessageType<L>>(
+        &mut self,
+        message: &TxMessage<T, L>,
+        blocking: bool,
+    ) -> Result<(), Self::Error>;
 
     /// Receive CAN message
-    fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Self::Error>;
+    /// * `blocking`: if true, function blocks until RX fifo contains at least one message
+    fn receive<const L: usize>(&mut self, data: &mut [u8; L], blocking: bool) -> Result<(), Self::Error>;
     /// Set corresponding filter and mask registers
     fn set_filter_object(&mut self, filter: Filter) -> Result<(), Self::Error>;
 }
@@ -126,18 +136,18 @@ pub trait CanController {
 impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS, CLK> {
     type Error = Error<B::Error, CS::Error>;
 
-    fn transmit<const L: usize, T: MessageType<L>>(&mut self, message: &TxMessage<T, L>) -> Result<(), Self::Error> {
-        // make sure there is space for new message in TX FIFO
-        // read byte 0 of TX FIFO status register
-        let status_reg_addr = Self::fifo_status_register(FIFO_TX_INDEX);
+    fn transmit<const L: usize, T: MessageType<L>>(
+        &mut self,
+        message: &TxMessage<T, L>,
+        blocking: bool,
+    ) -> Result<(), Self::Error> {
+        let fifo_status_reg = Self::fifo_status_register(FIFO_TX_INDEX);
 
-        let mut txfifo_status_byte0 = self.read_register(status_reg_addr)?;
-        let mut txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
-
-        // block until there is room available for new message in TX FIFO
-        while !txfifo_status_reg0.tfnrfnif() {
-            txfifo_status_byte0 = self.read_register(status_reg_addr)?;
-            txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+        // Check if TX fifo is full
+        while !self.fifo_tfnrfnif(fifo_status_reg)? {
+            if !blocking {
+                return Err(Error::TxFifoFullErr);
+            }
         }
 
         // make sure length of payload is consistent with CAN operation mode
@@ -163,28 +173,22 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         // Request transmission (set txreq) and set uinc in TX FIFO control register byte 1
         self.write_register(fifo_control_reg1, 0x03)?;
 
-        // read TX FIFO control register byte 1
-        let mut txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
-        let mut txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
-
-        // block till txreq is cleared confirming that all messages in TX FIFO are transmitted
-        while txfifo_control_reg.txreq() {
-            txfifo_control_byte1 = self.read_register(fifo_control_reg1)?;
-            txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
+        // block till TXREQ is cleared confirming that all messages in TX FIFO are transmitted
+        if blocking {
+            while !self.txfifo_cleared(fifo_control_reg1)? {}
         }
+
         Ok(())
     }
 
-    fn receive<const L: usize>(&mut self, data: &mut [u8; L]) -> Result<(), Self::Error> {
+    fn receive<const L: usize>(&mut self, data: &mut [u8; L], blocking: bool) -> Result<(), Self::Error> {
         let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
 
-        let mut rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
-        let mut rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
-
-        // block until fifo rx contains at least one message
-        while !rxfifo_status_reg0.tfnrfnif() {
-            rxfifo_status_byte0 = self.read_register(fifo_status_reg)?;
-            rxfifo_status_reg0 = FifoStatusReg0::from(rxfifo_status_byte0);
+        // Make sure RX fifo is not empty
+        while !self.fifo_tfnrfnif(fifo_status_reg)? {
+            if !blocking {
+                return Err(Error::RxFifoEmptyErr);
+            }
         }
 
         let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
@@ -493,6 +497,29 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
         buffer[1] = (command & 0xFF) as u8;
 
         buffer
+    }
+
+    /// Returns if the TX/RX fifo not full/empty flag is set
+    fn fifo_tfnrfnif(&mut self, fifo_reg_addr: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
+        let txfifo_status_byte0 = self.read_register(fifo_reg_addr)?;
+        let txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
+
+        if txfifo_status_reg0.tfnrfnif() {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Returns true if `TXREQ` bit of TX fifo is cleared i.e. all messages contained are transmitted
+    fn txfifo_cleared(&mut self, fifo_ctrl_reg: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
+        // read TX FIFO control register byte 1
+        let txfifo_control_byte1 = self.read_register(fifo_ctrl_reg)?;
+        let txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
+
+        if txfifo_control_reg.txreq() {
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     /// Returns the configuration register address for the given FIFO index

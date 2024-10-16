@@ -136,12 +136,12 @@ fn main() -> ! {
     let mut receive_buffer = [0u8; 8];
 
     loop {
-        can_controller.transmit(&can_message).unwrap();
+        can_controller.transmit(&can_message, true).unwrap();
         uart.write_raw(b"can message sent\n\r").unwrap();
 
         timer.delay_ms(500);
 
-        match can_controller.receive(&mut receive_buffer) {
+        match can_controller.receive(&mut receive_buffer, true) {
             Ok(_) => {
                 uart.write_fmt(format_args!("can message received\n\r")).unwrap();
 
