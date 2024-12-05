@@ -10,6 +10,7 @@ pub mod mutex;
 use crate::clock::SystemClock;
 use crate::heap::Heap;
 use bytes::Bytes;
+use core::cell::RefCell;
 use core::fmt::Write;
 use embedded_can::{Id, StandardId};
 use embedded_hal::delay::DelayNs;
@@ -36,6 +37,7 @@ use bsp::{
         Spi, Timer,
     },
 };
+use embedded_hal_bus::spi::{NoDelay, RefCellDevice};
 
 const XTAL_FREQ_HZ: u32 = 12_000_000u32;
 
@@ -94,7 +96,11 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let mut can_controller: MCP2517<_, _, SystemClock> = MCP2517::new(spi, pin_cs);
+    let spi_bus = RefCell::new(spi);
+
+    let device = RefCellDevice::new(&spi_bus, pin_cs, NoDelay).unwrap();
+
+    let mut can_controller: MCP2517<_, _> = MCP2517::new(device);
 
     // Setup clk config
     let clk_config = ClockConfiguration {
@@ -115,6 +121,7 @@ fn main() -> ! {
         bit_rate: BitRateConfig::default(),
     };
 
+    let _ = can_controller.reset();
     if let Err(_) = can_controller.configure(&config, &sys_clk) {
         panic!()
     }
@@ -126,17 +133,15 @@ fn main() -> ! {
     // Set mask to match if only 2 LSB of ID match with filter
     filter.set_mask_standard_id(0xFF);
     let _ = can_controller.set_filter_object(filter);
-
     // Create message frame
+    let payload_8 = [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8];
     let message_type = Can20::<8> {};
-    let payload = [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8];
-    let pl_bytes = Bytes::copy_from_slice(&payload);
-    let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
+    let pl_8bytes = Bytes::copy_from_slice(&payload_8);
+    let can_message = TxMessage::new(message_type, pl_8bytes, can_id).unwrap();
 
     let mut receive_buffer = [0u8; 8];
-
     loop {
-        can_controller.transmit(&can_message, true).unwrap();
+        let _ = can_controller.transmit(&can_message, true);
         uart.write_raw(b"can message sent\n\r").unwrap();
 
         timer.delay_ms(500);
@@ -149,7 +154,7 @@ fn main() -> ! {
                     uart.write_fmt(format_args!("{val}\n\r")).unwrap();
                 }
             }
-            Err(e) => uart.write_fmt(format_args!("error reading message {:?}\n\r", e)).unwrap(),
+            Err(_) => uart.write_fmt(format_args!("error reading message")).unwrap(),
         }
 
         timer.delay_ms(500);

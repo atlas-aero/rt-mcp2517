@@ -5,81 +5,133 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::convert::Infallible;
-use embedded_hal::blocking::spi::Transfer;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::spi::{ErrorType, Operation, SpiDevice};
 use embedded_time::clock::Error;
 use embedded_time::duration::{Duration, Fraction};
 use embedded_time::fixed_point::FixedPoint;
 use embedded_time::timer::param::{Armed, OneShot};
 use embedded_time::{Clock, Instant, Timer};
 
-#[derive(Default)]
-pub struct ExampleSPIBus {
+#[derive(Default, Debug)]
+pub struct ExampleSPIDevice {
     read_calls: u32,
 }
 
-impl Transfer<u8> for ExampleSPIBus {
+impl ErrorType for ExampleSPIDevice {
     type Error = Infallible;
+}
 
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-        // write command -> returns empty buffer
-        if (words[0] >> 4) == 0x2 {
-            return Ok(&[0u8; 3]);
+impl SpiDevice<u8> for ExampleSPIDevice {
+    fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
+        if operations[0] == Operation::Write(&[0x30, 0x70]) {
+            // C1FIFOUA2
+            if let Operation::Read(read) = &mut operations[1] {
+                read.copy_from_slice(&[0, 0, 0x04, 0xA2]);
+                return Ok(());
+            }
         }
 
-        // RAM read command
-        if words.len() == 8 && words == [0u8; 8] {
-            words.iter_mut().enumerate().for_each(|(i, val)| {
-                *val += (i + 1) as u8;
-            });
-            return Ok(&[0u8; 8]);
+        if operations[0] == Operation::Write(&[0x30, 0x64]) {
+            // C1FIFOUA1
+            if let Operation::Read(read) = &mut operations[1] {
+                read.copy_from_slice(&[0, 0, 0x04, 0x7C]);
+                return Ok(());
+            }
+        }
+
+        // RAM Read command
+        if let Operation::Write(_) = operations[0] {
+            if operations.len() == 2 {
+                if let Operation::Read(read) = &mut operations[1] {
+                    if read.len() == 8 {
+                        read.iter_mut().enumerate().for_each(|(i, val)| {
+                            *val += (i + 1) as u8;
+                        });
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn transfer_in_place(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        if (buf[0] >> 4) == 0x2 {
+            return Ok(());
         }
 
         // SFR Read command
-        if words[0] >= 0x3 {
-            return match words[1] {
+        if buf[0] == 0x30 {
+            match buf[1] {
                 // addr: C1CON reg 2
                 0x2 => {
                     // configuration mode
                     if self.read_calls == 0 {
                         self.read_calls += 1;
-                        return Ok(&[0, 0, 0b1001_0100]);
+                        buf.copy_from_slice(&[0, 0, 0b1001_0100]);
+                        return Ok(());
                     }
 
                     // return operation mode NormalCANFD mode (called in configure and during transmission)
-                    Ok(&[0x0, 0x0, 0b0000_0000])
+                    buf.copy_from_slice(&[0x0, 0x0, 0b0000_0000]);
                 }
                 // C1FIFOSTA2
-                0x6C => Ok(&[0, 0, 0x1]),
-                // C1FIFOUA2 (2 extra bytes in beginning for cmd+addr)
-                0x70 => Ok(&[0, 0, 0, 0, 0x04, 0xA2]),
+                0x6C => buf.copy_from_slice(&[0, 0, 0x1]),
                 // C1FIFOCON2 register 1
-                0x69 => Ok(&[0, 0, 0]),
+                0x69 => buf.copy_from_slice(&[0, 0, 0]),
                 // C1FIFOSTA1
-                0x60 => Ok(&[0, 0, 0x1]),
-                // C1FIFOUA1
-                0x64 => Ok(&[0, 0, 0, 0x04, 0x7C]),
-
-                _ => Ok(&[0, 0, 0]),
-            };
+                0x60 => buf.copy_from_slice(&[0, 0, 0x1]),
+                _ => {}
+            }
         }
-
-        Ok(&[0u8; 3])
-    }
-}
-
-pub struct ExampleCSPin {}
-
-impl OutputPin for ExampleCSPin {
-    type Error = Infallible;
-
-    fn set_low(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
+    // fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+    //     // write command -> returns empty buffer
+    //     if (write[0] >> 4) == 0x2 {
+    //         return Ok(());
+    //     }
 
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
+    //     // RAM read command
+    //     if read.len() == 8 && read == [0u8; 8] {
+    //         read.iter_mut().enumerate().for_each(|(i, val)| {
+    //             *val += (i + 1) as u8;
+    //         });
+    //         return Ok(());
+    //     }
+
+    //     // SFR Read command
+    //     if write[0] >= 0x3 {
+    //         match write[1] {
+    //             // addr: C1CON reg 2
+    //             0x2 => {
+    //                 // configuration mode
+    //                 if self.read_calls == 0 {
+    //                     self.read_calls += 1;
+    //                     read.copy_from_slice(&[0, 0, 0b1001_0100]);
+    //                 }
+
+    //                 // return operation mode NormalCANFD mode (called in configure and during transmission)
+    //                 read.copy_from_slice(&[0x0, 0x0, 0b0000_0000]);
+    //             }
+    //             // C1FIFOSTA2
+    //             0x6C => read.copy_from_slice(&[0, 0, 0x1]),
+    //             // C1FIFOUA2 (2 extra bytes in beginning for cmd+addr)
+    //             0x70 => read.copy_from_slice(&[0, 0, 0, 0, 0x04, 0xA2]),
+    //             // C1FIFOCON2 register 1
+    //             0x69 => read.copy_from_slice(&[0, 0, 0]),
+    //             // C1FIFOSTA1
+    //             0x60 => read.copy_from_slice(&[0, 0, 0x1]),
+    //             // C1FIFOUA1
+    //             0x64 => read.copy_from_slice(&[0, 0, 0, 0x04, 0x7C]),
+
+    //             _ => {}
+    //         };
+    //     }
+
+    //    Ok(())
+    // }
 }
 
 #[derive(Debug, PartialEq, Eq)]

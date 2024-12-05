@@ -23,96 +23,15 @@ fn test_set_filter_object_standard_id() {
     let mut mocks = Mocks::default();
 
     // disable filter 0
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xD1, 0x00], data);
-            Ok(&[0u8; 3])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_register_write([0x21, 0xD1, 0x00], &mut seq);
 
     // write filter value
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xF8, 0xA5, 0x6, 0x0, 0x0], data);
-            Ok(&[0u8; 2])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-
+    mocks.expect_write([0x21, 0xF8, 0xA5, 0x6, 0x0, 0x0], &mut seq);
     // write mask value
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xFC, 0x3, 0u8, 0u8, 0x40], data);
-            Ok(&[0u8; 6])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_write([0x21, 0xFC, 0x3, 0u8, 0u8, 0x40], &mut seq);
 
     // enable filter
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xD1, 0x81], data);
-            Ok(&[0u8; 6])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_register_write([0x21, 0xD1, 0x81], &mut seq);
 
     let result = mocks.into_controller().set_filter_object(filter);
 
@@ -132,96 +51,16 @@ fn test_set_filter_object_extended_id() {
     let mut mocks = Mocks::default();
 
     // disable filter 0
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xD0, 0x00], data);
-            Ok(&[0u8; 3])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_register_write([0x21, 0xD0, 0x00], &mut seq);
 
     // write filter value
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xF0, 0x32, 0x5D, 0x51, 0x09], data);
-            Ok(&[0u8; 2])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_write([0x21, 0xF0, 0x32, 0x5D, 0x51, 0x09], &mut seq);
 
     // write mask value
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xF4, 0u8, 0x6, 0u8, 0u8], data);
-            Ok(&[0u8; 6])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_write([0x21, 0xF4, 0u8, 0x6, 0u8, 0u8], &mut seq);
 
     // enable filter
-    mocks
-        .pin_cs
-        .expect_set_low()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
-    mocks
-        .bus
-        .expect_transfer()
-        .times(1)
-        .returning(move |data| {
-            assert_eq!([0x21, 0xD0, 0x81], data);
-            Ok(&[0u8; 6])
-        })
-        .in_sequence(&mut seq);
-    mocks
-        .pin_cs
-        .expect_set_high()
-        .times(1)
-        .return_const(Ok(()))
-        .in_sequence(&mut seq);
+    mocks.expect_register_write([0x21, 0xD0, 0x81], &mut seq);
 
     let result_extended = mocks.into_controller().set_filter_object(filter);
 
