@@ -87,51 +87,6 @@ impl SpiDevice<u8> for ExampleSPIDevice {
         }
         Ok(())
     }
-    // fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-    //     // write command -> returns empty buffer
-    //     if (write[0] >> 4) == 0x2 {
-    //         return Ok(());
-    //     }
-
-    //     // RAM read command
-    //     if read.len() == 8 && read == [0u8; 8] {
-    //         read.iter_mut().enumerate().for_each(|(i, val)| {
-    //             *val += (i + 1) as u8;
-    //         });
-    //         return Ok(());
-    //     }
-
-    //     // SFR Read command
-    //     if write[0] >= 0x3 {
-    //         match write[1] {
-    //             // addr: C1CON reg 2
-    //             0x2 => {
-    //                 // configuration mode
-    //                 if self.read_calls == 0 {
-    //                     self.read_calls += 1;
-    //                     read.copy_from_slice(&[0, 0, 0b1001_0100]);
-    //                 }
-
-    //                 // return operation mode NormalCANFD mode (called in configure and during transmission)
-    //                 read.copy_from_slice(&[0x0, 0x0, 0b0000_0000]);
-    //             }
-    //             // C1FIFOSTA2
-    //             0x6C => read.copy_from_slice(&[0, 0, 0x1]),
-    //             // C1FIFOUA2 (2 extra bytes in beginning for cmd+addr)
-    //             0x70 => read.copy_from_slice(&[0, 0, 0, 0, 0x04, 0xA2]),
-    //             // C1FIFOCON2 register 1
-    //             0x69 => read.copy_from_slice(&[0, 0, 0]),
-    //             // C1FIFOSTA1
-    //             0x60 => read.copy_from_slice(&[0, 0, 0x1]),
-    //             // C1FIFOUA1
-    //             0x64 => read.copy_from_slice(&[0, 0, 0, 0x04, 0x7C]),
-
-    //             _ => {}
-    //         };
-    //     }
-
-    //    Ok(())
-    // }
 }
 
 #[derive(Debug, PartialEq, Eq)]
