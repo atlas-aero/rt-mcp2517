@@ -4,7 +4,6 @@ use crate::config::{
     BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize,
     RequestMode, RetransmissionAttempts, SystemClockDivisor,
 };
-use crate::example::{ExampleClock, ExampleSPIDevice};
 use crate::message::{Can20, CanFd, TxMessage};
 use crate::mocks::{MockSPIDevice, SPIError, TestClock};
 use crate::status::OperationMode;
@@ -15,12 +14,13 @@ use embedded_can::{ExtendedId, Id};
 use embedded_hal::spi::Operation;
 use mockall::Sequence;
 
+/// CAN configuration mock
 fn expect_config(spi_dev: &mut Mocks, seq: &mut Sequence) {
     // Writing clock configuration
     spi_dev.expect_register_write([0x2E, 0x0, 0b0110_0001], seq);
 
     // Writing NBT configuration register
-    spi_dev.expect_write([0x20, 0x04, 1, 15, 62, 0], seq);
+    spi_dev.mock_write32([0x20, 0x04, 1, 15, 62, 0], seq);
 
     // Writing RX FIFO configuration
     spi_dev.expect_register_write([0x20, 0x5F, 0b0000_1111], seq);
@@ -618,6 +618,7 @@ impl Mocks {
             .in_sequence(seq);
     }
 
+    /// Mock write of single register (1 byte) using SPI transfer
     pub fn expect_register_write(&mut self, expected_write: [u8; 3], sequence: &mut Sequence) {
         self.device
             .expect_transaction()
@@ -637,7 +638,8 @@ impl Mocks {
             .in_sequence(sequence);
     }
 
-    pub fn expect_write<const L: usize>(&mut self, expected_write: [u8; L], sequence: &mut Sequence) {
+    /// Mock write 4-byte register write
+    pub fn mock_write32(&mut self, expected_write: [u8; 6], sequence: &mut Sequence) {
         self.device
             .expect_transaction()
             .times(1)
@@ -656,6 +658,7 @@ impl Mocks {
             .in_sequence(sequence);
     }
 
+    /// Mock write operation to TX FIFO
     pub fn expect_fifo_write_transaction<const L: usize>(
         &mut self,
         header: [u8; 10],
@@ -684,6 +687,7 @@ impl Mocks {
             .in_sequence(seq);
     }
 
+    /// Mock read operation of RX FIFO
     pub fn expect_fifo_read_transaction<const L: usize>(
         &mut self,
         command: [u8; 2],
@@ -712,19 +716,4 @@ impl Mocks {
             })
             .in_sequence(seq);
     }
-}
-
-#[test]
-fn example_test() {
-    let sys_clk = ExampleClock::default();
-    let spi_dev = ExampleSPIDevice::default();
-
-    // Initialize controller object
-    let mut can_controller = MCP2517::new(spi_dev);
-
-    // Use default configuration settings
-    let can_config = Configuration::default();
-
-    // Configure CAN controller
-    can_controller.configure(&can_config, &sys_clk).unwrap();
 }

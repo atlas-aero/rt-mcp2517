@@ -26,9 +26,9 @@ fn test_set_filter_object_standard_id() {
     mocks.expect_register_write([0x21, 0xD1, 0x00], &mut seq);
 
     // write filter value
-    mocks.expect_write([0x21, 0xF8, 0xA5, 0x6, 0x0, 0x0], &mut seq);
+    mocks.mock_write32([0x21, 0xF8, 0xA5, 0x6, 0x0, 0x0], &mut seq);
     // write mask value
-    mocks.expect_write([0x21, 0xFC, 0x3, 0u8, 0u8, 0x40], &mut seq);
+    mocks.mock_write32([0x21, 0xFC, 0x3, 0u8, 0u8, 0x40], &mut seq);
 
     // enable filter
     mocks.expect_register_write([0x21, 0xD1, 0x81], &mut seq);
@@ -54,10 +54,10 @@ fn test_set_filter_object_extended_id() {
     mocks.expect_register_write([0x21, 0xD0, 0x00], &mut seq);
 
     // write filter value
-    mocks.expect_write([0x21, 0xF0, 0x32, 0x5D, 0x51, 0x09], &mut seq);
+    mocks.mock_write32([0x21, 0xF0, 0x32, 0x5D, 0x51, 0x09], &mut seq);
 
     // write mask value
-    mocks.expect_write([0x21, 0xF4, 0u8, 0x6, 0u8, 0u8], &mut seq);
+    mocks.mock_write32([0x21, 0xF4, 0u8, 0x6, 0u8, 0u8], &mut seq);
 
     // enable filter
     mocks.expect_register_write([0x21, 0xD0, 0x81], &mut seq);
