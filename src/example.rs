@@ -26,7 +26,7 @@ impl SpiDevice<u8> for ExampleSPIDevice {
         if operations[0] == Operation::Write(&[0x30, 0x70]) {
             // C1FIFOUA2
             if let Operation::Read(read) = &mut operations[1] {
-                read.copy_from_slice(&[0, 0, 0x04, 0xA2]);
+                read.copy_from_slice(&[0xA2, 0x04, 0x0, 0x0]);
                 return Ok(());
             }
         }
@@ -34,23 +34,20 @@ impl SpiDevice<u8> for ExampleSPIDevice {
         if operations[0] == Operation::Write(&[0x30, 0x64]) {
             // C1FIFOUA1
             if let Operation::Read(read) = &mut operations[1] {
-                read.copy_from_slice(&[0, 0, 0x04, 0x7C]);
+                read.copy_from_slice(&[0x7C, 0x04, 0x0, 0x0]);
                 return Ok(());
             }
         }
 
-        // RAM Read command
-        if let Operation::Write(_) = operations[0] {
-            if operations.len() == 2 {
-                if let Operation::Read(read) = &mut operations[1] {
-                    if read.len() == 8 {
-                        read.iter_mut().enumerate().for_each(|(i, val)| {
-                            *val += (i + 1) as u8;
-                        });
-                        return Ok(());
-                    }
-                }
+        // Read RX fifo (payload received)
+        if operations[0] != Operation::Write(&[0x38, 0x84]) {
+            return Ok(());
+        }
+        if let Operation::Read(words) = &mut operations[1] {
+            if words.len() != 8 {
+                return Ok(());
             }
+            words.copy_from_slice(&[0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
         }
 
         Ok(())

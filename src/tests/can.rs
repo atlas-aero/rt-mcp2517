@@ -1,16 +1,18 @@
 use crate::can::CanController;
 use crate::can::{CanError, MCP2517};
 use crate::config::{
-    BitRateConfig, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting, PayloadSize,
-    RequestMode, RetransmissionAttempts, SystemClockDivisor,
+    BitRateConfig, CanBaudRate, ClockConfiguration, ClockOutputDivisor, Configuration, FifoConfiguration, PLLSetting,
+    PayloadSize, RequestMode, RetransmissionAttempts, SysClk, SystemClockDivisor,
 };
+use crate::example::{ExampleClock, ExampleSPIDevice};
+use crate::filter::Filter;
 use crate::message::{Can20, CanFd, TxMessage};
 use crate::mocks::{MockSPIDevice, SPIError, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use bytes::Bytes;
-use embedded_can::{ExtendedId, Id};
+use embedded_can::{ExtendedId, Id, StandardId};
 use embedded_hal::spi::Operation;
 use mockall::Sequence;
 
@@ -716,4 +718,65 @@ impl Mocks {
             })
             .in_sequence(seq);
     }
+}
+
+#[test]
+fn test_lib() {
+    let spi_dev = ExampleSPIDevice::default();
+    let clock = ExampleClock::default();
+
+    let mut controller = MCP2517::new(spi_dev);
+
+    // configure CAN controller
+    controller
+        .configure(
+            &Configuration {
+                clock: ClockConfiguration {
+                    clock_output: ClockOutputDivisor::DivideBy10,
+                    system_clock: SystemClockDivisor::DivideBy1,
+                    disable_clock: false,
+                    pll: PLLSetting::TenTimesPLL,
+                },
+                fifo: FifoConfiguration {
+                    rx_size: 16,
+                    tx_attempts: RetransmissionAttempts::Three,
+                    tx_priority: 10,
+                    pl_size: PayloadSize::EightBytes,
+                    tx_size: 20,
+                    tx_enable: true,
+                },
+                mode: RequestMode::NormalCANFD,
+                bit_rate: BitRateConfig {
+                    sys_clk: SysClk::MHz20,
+                    can_speed: CanBaudRate::Kpbs500,
+                },
+            },
+            &clock,
+        )
+        .unwrap();
+
+    // Create message frame
+    let can_id = Id::Standard(StandardId::new(0x55).unwrap());
+
+    // Important note: Generic arg for message type for CAN2.0
+    // should be either 4 or 8, the DLC will be based off the
+    // length of the payload buffer. So for a payload of 5 bytes
+    // you can only use Can20::<8> as the message type
+    let message_type = Can20::<8> {};
+    let payload = [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8];
+    let pl_bytes = Bytes::copy_from_slice(&payload);
+    let can_message = TxMessage::new(message_type, pl_bytes, can_id).unwrap();
+
+    // Create and set filter object
+    let filter = Filter::new(can_id, 0).unwrap();
+    let _ = controller.set_filter_object(filter);
+
+    // Transmit CAN message in blocking mode
+    controller.transmit(&can_message, true).unwrap();
+
+    // Receive CAN message in blocking mode
+    let mut buff = [0u8; 8];
+    let result = controller.receive(&mut buff, true);
+    assert!(result.is_ok());
+    assert_eq!(buff, [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
 }
