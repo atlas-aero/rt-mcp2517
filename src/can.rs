@@ -6,11 +6,10 @@
 //!# use mcp2517::example::*;
 //!#
 //! let sys_clk = ExampleClock::default();
-//! let spi_bus = ExampleSPIBus::default();
-//! let cs_pin = ExampleCSPin{};
+//! let spi_dev = ExampleSPIDevice::default();
 //!
 //! // Initialize controller object
-//! let mut can_controller = MCP2517::new(spi_bus,cs_pin);
+//! let mut can_controller = MCP2517::new(spi_dev);
 //!
 //! // Use default configuration settings
 //! let can_config = Configuration::default();
@@ -18,17 +17,16 @@
 //! // Configure CAN controller
 //! can_controller.configure(&can_config, &sys_clk).unwrap();
 //! ```
-use crate::can::BusError::{CSError, TransferError};
-use crate::can::ConfigError::{ClockError, ConfigurationModeTimeout, RequestModeTimeout};
+
 use crate::config::{ClockConfiguration, Configuration};
 use crate::filter::Filter;
 use crate::message::{MessageType, TxMessage};
 use crate::registers::{FifoControlReg1, FifoStatusReg0, C1NBTCFG};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use core::fmt::Debug;
 use core::marker::PhantomData;
-use embedded_hal::blocking::spi::Transfer;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::spi::{Operation as SpiOperation, SpiDevice};
 use embedded_time::duration::Milliseconds;
 use embedded_time::Clock;
 use log::debug;
@@ -45,39 +43,27 @@ const FIFO_RX_INDEX: u8 = 1;
 /// FIFO index for transmitting CAN messages
 const FIFO_TX_INDEX: u8 = 2;
 
-/// General SPI Errors
-#[derive(Debug, PartialEq)]
-pub enum BusError<B, CS> {
-    /// Failed setting state of CS pin
-    CSError(CS),
-
-    /// SPI transfer failed
-    TransferError(B),
+#[derive(Debug)]
+pub enum SpiError<D: SpiDevice<u8>> {
+    BusError(D::Error),
+}
+impl<D: SpiDevice<u8>> PartialEq for SpiError<D> {
+    fn eq(&self, other: &Self) -> bool {
+        matches!((self, other), (Self::BusError(_), Self::BusError(_)))
+    }
 }
 
-/// Configuration errors
+/// Possible CAN errors during Configuration/Transmission/Reception
 #[derive(Debug, PartialEq)]
-pub enum ConfigError<B, CS> {
-    /// Low level bus communication error
-    BusError(BusError<B, CS>),
-
+pub enum CanError<D: SpiDevice<u8>> {
+    /// SPI bus transfer error
+    BusErr(SpiError<D>),
     /// Internal clock error
     ClockError,
-
     /// No configuration mode within timeout of 2 ms
     ConfigurationModeTimeout,
-
     /// Device did not enter given request mode within timeout of 2 ms
     RequestModeTimeout,
-}
-
-/// Possible errors transmitting CAN message
-#[derive(Debug, PartialEq)]
-pub enum Error<B, CS> {
-    /// Configuration error
-    ConfigErr(ConfigError<B, CS>),
-    /// SPI bus transfer error
-    BusErr(BusError<B, CS>),
     /// Invalid payload bytes length error
     InvalidPayloadLength(usize),
     /// Invalid Ram Address region error
@@ -90,25 +76,16 @@ pub enum Error<B, CS> {
     TxFifoFullErr,
 }
 
-impl<B, CS> From<BusError<B, CS>> for Error<B, CS> {
-    fn from(value: BusError<B, CS>) -> Self {
-        Error::BusErr(value)
-    }
-}
-
-impl<B, CS> From<ConfigError<B, CS>> for Error<B, CS> {
-    fn from(value: ConfigError<B, CS>) -> Self {
-        Error::ConfigErr(value)
+impl<D: SpiDevice<u8>> From<SpiError<D>> for CanError<D> {
+    fn from(value: SpiError<D>) -> Self {
+        CanError::BusErr(value)
     }
 }
 
 /// Main MCP2517 CAN controller device
-pub struct MCP2517<B: Transfer<u8>, CS: OutputPin, CLK: Clock> {
-    /// SPI bus
-    bus: B,
-
-    /// CS pin
-    pin_cs: CS,
+pub struct MCP2517<D: SpiDevice<u8>, CLK: Clock> {
+    /// Device on SPI bus
+    device: D,
 
     /// System clock
     clock: PhantomData<CLK>,
@@ -133,8 +110,12 @@ pub trait CanController {
     fn set_filter_object(&mut self, filter: Filter) -> Result<(), Self::Error>;
 }
 
-impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS, CLK> {
-    type Error = Error<B::Error, CS::Error>;
+impl<D, CLK> CanController for MCP2517<D, CLK>
+where
+    D: SpiDevice<u8>,
+    CLK: Clock,
+{
+    type Error = CanError<D>;
 
     fn transmit<const L: usize, T: MessageType<L>>(
         &mut self,
@@ -146,7 +127,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         // Check if TX fifo is full
         while !self.fifo_tfnrfnif(fifo_status_reg)? {
             if !blocking {
-                return Err(Error::TxFifoFullErr);
+                return Err(CanError::TxFifoFullErr);
             }
         }
 
@@ -154,7 +135,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         let operation_status = self.read_operation_status()?;
 
         if message.buff.len() > 8 && operation_status.mode != OperationMode::NormalCANFD {
-            return Err(Error::InvalidPayloadLength(message.buff.len()));
+            return Err(CanError::InvalidPayloadLength(message.buff.len()));
         }
 
         // get address in which to write next message in TX FIFO (should not be read in configuration mode)
@@ -187,7 +168,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
         // Make sure RX fifo is not empty
         while !self.fifo_tfnrfnif(fifo_status_reg)? {
             if !blocking {
-                return Err(Error::RxFifoEmptyErr);
+                return Err(CanError::RxFifoEmptyErr);
             }
         }
 
@@ -226,18 +207,21 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> CanController for MCP2517<B, CS
     }
 }
 
-impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
-    pub fn new(bus: B, pin_cs: CS) -> Self {
+impl<D, CLK> MCP2517<D, CLK>
+where
+    D: SpiDevice,
+    CLK: Clock,
+{
+    pub fn new(spi_dev: D) -> Self {
         Self {
-            bus,
-            pin_cs,
+            device: spi_dev,
             clock: Default::default(),
         }
     }
 
     /// Configures the controller with the given settings
-    pub fn configure(&mut self, config: &Configuration, clock: &CLK) -> Result<(), ConfigError<B::Error, CS::Error>> {
-        self.enable_mode(OperationMode::Configuration, clock, ConfigurationModeTimeout)?;
+    pub fn configure(&mut self, config: &Configuration, clock: &CLK) -> Result<(), CanError<D>> {
+        self.enable_mode(OperationMode::Configuration, clock, CanError::ConfigurationModeTimeout)?;
 
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
 
@@ -268,13 +252,13 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
 
         self.enable_filter(FIFO_RX_INDEX, 0)?;
 
-        self.enable_mode(config.mode.to_operation_mode(), clock, RequestModeTimeout)?;
+        self.enable_mode(config.mode.to_operation_mode(), clock, CanError::RequestModeTimeout)?;
 
         Ok(())
     }
 
     /// Disable corresponding filter
-    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+    pub fn disable_filter(&mut self, filter_index: u8) -> Result<(), CanError<D>> {
         let filter_reg = Self::filter_control_register_byte(filter_index);
         self.write_register(filter_reg, 0x00)?;
 
@@ -282,21 +266,21 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// Reads and returns the operation status
-    pub fn read_operation_status(&mut self) -> Result<OperationStatus, BusError<B::Error, CS::Error>> {
+    pub fn read_operation_status(&mut self) -> Result<OperationStatus, CanError<D>> {
         let data = self.read_register(REGISTER_C1CON + 2)?;
 
         Ok(OperationStatus::from_register(data))
     }
 
     /// Reads and returns the oscillator status
-    pub fn read_oscillator_status(&mut self) -> Result<OscillatorStatus, BusError<B::Error, CS::Error>> {
+    pub fn read_oscillator_status(&mut self) -> Result<OscillatorStatus, CanError<D>> {
         let data = self.read_register(REGISTER_OSC + 1)?;
 
         Ok(OscillatorStatus::from_register(data))
     }
 
     /// Reads and returns the current clock configuration
-    pub fn read_clock_configuration(&mut self) -> Result<ClockConfiguration, BusError<B::Error, CS::Error>> {
+    pub fn read_clock_configuration(&mut self) -> Result<ClockConfiguration, CanError<D>> {
         let data = self.read_register(REGISTER_OSC)?;
 
         Ok(ClockConfiguration::from_register(data))
@@ -304,15 +288,10 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
 
     /// Enters the given mode, aborts all running transactions
     /// and waits max. 2 ms for the given mode to be reached
-    fn enable_mode(
-        &mut self,
-        mode: OperationMode,
-        clock: &CLK,
-        timeout_error: ConfigError<B::Error, CS::Error>,
-    ) -> Result<(), ConfigError<B::Error, CS::Error>> {
+    fn enable_mode(&mut self, mode: OperationMode, clock: &CLK, timeout_error: CanError<D>) -> Result<(), CanError<D>> {
         self.write_register(REGISTER_C1CON + 3, mode as u8 | (1 << 3))?;
 
-        let target = clock.try_now()?.checked_add(Milliseconds::new(2)).ok_or(ClockError)?;
+        let target = clock.try_now()?.checked_add(Milliseconds::new(2)).ok_or(CanError::ClockError)?;
 
         let mut current_mode = None;
 
@@ -329,7 +308,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// Enable filter for corresponding RX FIFO
-    pub fn enable_filter(&mut self, fifo_index: u8, filter_index: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+    pub fn enable_filter(&mut self, fifo_index: u8, filter_index: u8) -> Result<(), CanError<D>> {
         let filter_control_reg = Self::filter_control_register_byte(filter_index);
 
         // Filter must be disabled to modify FmBP
@@ -345,7 +324,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// Writes a single register byte
-    fn write_register(&mut self, register: u16, value: u8) -> Result<(), BusError<B::Error, CS::Error>> {
+    fn write_register(&mut self, register: u16, value: u8) -> Result<(), SpiError<D>> {
         let mut buffer = self.cmd_buffer(register, Operation::Write);
         buffer[2] = value;
 
@@ -354,7 +333,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// 4-byte SFR write
-    fn write32(&mut self, register: u16, value: u32) -> Result<(), BusError<B::Error, CS::Error>> {
+    fn write32(&mut self, register: u16, value: u32) -> Result<(), SpiError<D>> {
         let mut buffer = [0u8; 6];
         let command = (register & 0x0FFF) | ((Operation::Write as u16) << 12);
 
@@ -364,15 +343,13 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
         buffer[1] = (command & 0xFF) as u8;
         buffer[2..].copy_from_slice(&value_bytes);
 
-        self.pin_cs.set_low().map_err(CSError)?;
-        self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.pin_cs.set_high().map_err(CSError)?;
+        self.device.write(&buffer).map_err(SpiError::BusError)?;
 
         Ok(())
     }
 
     /// Reset internal register to default and switch to Configuration mode
-    pub fn reset(&mut self) -> Result<(), BusError<B::Error, CS::Error>> {
+    pub fn reset(&mut self) -> Result<(), CanError<D>> {
         let mut buffer = self.cmd_buffer(0u16, Operation::Reset);
         self.transfer(&mut buffer)?;
 
@@ -380,11 +357,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// Insert message object in TX FIFO
-    fn write_fifo<T, const L: usize>(
-        &mut self,
-        register: u16,
-        message: &TxMessage<T, L>,
-    ) -> Result<(), Error<B::Error, CS::Error>>
+    fn write_fifo<T, const L: usize>(&mut self, register: u16, message: &TxMessage<T, L>) -> Result<(), CanError<D>>
     where
         T: MessageType<L>,
     {
@@ -405,25 +378,19 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
             let num = BigEndian::read_u32(word);
             LittleEndian::write_u32(word, num);
         }
-
-        self.pin_cs.set_low().map_err(CSError)?;
-        self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(&mut data).map_err(TransferError)?;
-        self.pin_cs.set_high().map_err(CSError)?;
+        let mut operations = [SpiOperation::Write(&buffer), SpiOperation::Write(&data)];
+        self.device.transaction(&mut operations).map_err(SpiError::BusError)?;
 
         Ok(())
     }
 
     /// Read message from RX FIFO
-    pub(crate) fn read_fifo<const L: usize>(
-        &mut self,
-        register: u16,
-        data: &mut [u8; L],
-    ) -> Result<(), Error<B::Error, CS::Error>> {
+    pub(crate) fn read_fifo<const L: usize>(&mut self, register: u16, data: &mut [u8; L]) -> Result<(), CanError<D>> {
         if L % 4 != 0 {
-            return Err(Error::InvalidBufferSize(L));
+            return Err(CanError::InvalidBufferSize(L));
         }
 
+        // Skip Transmit message object header
         let payload_address = register + 8;
         let mut buffer = [0u8; 2];
 
@@ -432,60 +399,54 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
 
-        self.pin_cs.set_low().map_err(CSError)?;
-        self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.bus.transfer(data).map_err(TransferError)?;
-        self.pin_cs.set_high().map_err(CSError)?;
+        let mut operations = [SpiOperation::Write(&buffer), SpiOperation::Read(data)];
+        self.device.transaction(&mut operations).map_err(SpiError::BusError)?;
 
         Ok(())
     }
 
     /// 4-byte SFR read
-    fn read32(&mut self, register: u16) -> Result<u32, BusError<B::Error, CS::Error>> {
-        // create 6 byte cmd buffer (2 bytes cmd+addr , 4 bytes for register value)
-        let mut buffer = [0u8; 6];
+    fn read32(&mut self, register: u16) -> Result<u32, CanError<D>> {
+        // create cmd buffer (2 bytes cmd+addr)
+        let mut buffer = [0u8; 2];
+        // payload received buffer
+        let mut data = [0u8; 4];
         let command = (register & 0x0FFF) | ((Operation::Read as u16) << 12);
 
         buffer[0] = (command >> 8) as u8;
         buffer[1] = (command & 0xFF) as u8;
 
-        self.pin_cs.set_low().map_err(CSError)?;
-        self.bus.transfer(&mut buffer).map_err(TransferError)?;
-        self.pin_cs.set_high().map_err(CSError)?;
-
-        let slice = &buffer[2..];
+        let mut operations = [SpiOperation::Write(&buffer), SpiOperation::Read(&mut data)];
+        self.device.transaction(&mut operations).map_err(SpiError::BusError)?;
 
         // SFR addresses are at the LSB of the registers
         // so last read byte is the MSB of the register
         // and since bitfield_msb is used, order of bytes is reversed
-        let result = u32::from_le_bytes(slice.try_into().expect("wrong slice length"));
-
+        let result = u32::from_le_bytes(data);
         Ok(result)
     }
 
     /// Verify address within RAM bounds
-    fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), Error<B::Error, CS::Error>> {
+    fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), CanError<D>> {
         if addr < 0x400 || (addr + (data_length as u16)) > 0xBFF {
-            return Err(Error::InvalidRamAddress(addr));
+            return Err(CanError::InvalidRamAddress(addr));
         }
 
         Ok(())
     }
 
     /// Reads a single register byte
-    fn read_register(&mut self, register: u16) -> Result<u8, BusError<B::Error, CS::Error>> {
+    fn read_register(&mut self, register: u16) -> Result<u8, SpiError<D>> {
         let mut buffer = self.cmd_buffer(register, Operation::Read);
 
         self.transfer(&mut buffer)
     }
 
     /// Executes a SPI transfer with three bytes buffer and returns the last byte received
-    fn transfer(&mut self, buffer: &mut [u8]) -> Result<u8, BusError<B::Error, CS::Error>> {
-        self.pin_cs.set_low().map_err(CSError)?;
-        let result = self.bus.transfer(buffer).map_err(TransferError);
-        self.pin_cs.set_high().map_err(CSError)?;
+    fn transfer(&mut self, buffer: &mut [u8]) -> Result<u8, SpiError<D>> {
+        self.device.transfer_in_place(buffer).map_err(SpiError::BusError)?;
 
-        Ok(result?[2])
+        Ok(buffer[2])
     }
 
     /// Creates a three byte command buffer for the given register
@@ -500,7 +461,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// Returns if the TX/RX fifo not full/empty flag is set
-    fn fifo_tfnrfnif(&mut self, fifo_reg_addr: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
+    fn fifo_tfnrfnif(&mut self, fifo_reg_addr: u16) -> Result<bool, CanError<D>> {
         let txfifo_status_byte0 = self.read_register(fifo_reg_addr)?;
         let txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
 
@@ -511,7 +472,7 @@ impl<B: Transfer<u8>, CS: OutputPin, CLK: Clock> MCP2517<B, CS, CLK> {
     }
 
     /// Returns true if `TXREQ` bit of TX fifo is cleared i.e. all messages contained are transmitted
-    fn txfifo_cleared(&mut self, fifo_ctrl_reg: u16) -> Result<bool, BusError<B::Error, CS::Error>> {
+    fn txfifo_cleared(&mut self, fifo_ctrl_reg: u16) -> Result<bool, CanError<D>> {
         // read TX FIFO control register byte 1
         let txfifo_control_byte1 = self.read_register(fifo_ctrl_reg)?;
         let txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
@@ -561,14 +522,8 @@ enum Operation {
     Read = 0b0011,
 }
 
-impl<B, CS> From<embedded_time::clock::Error> for ConfigError<B, CS> {
+impl<D: SpiDevice> From<embedded_time::clock::Error> for CanError<D> {
     fn from(_error: embedded_time::clock::Error) -> Self {
-        ClockError
-    }
-}
-
-impl<B, CS> From<BusError<B, CS>> for ConfigError<B, CS> {
-    fn from(value: BusError<B, CS>) -> Self {
-        Self::BusError(value)
+        CanError::ClockError
     }
 }

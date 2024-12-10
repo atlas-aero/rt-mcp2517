@@ -1,8 +1,9 @@
 use alloc::vec::Vec;
 use core::cell::RefCell;
-use embedded_hal::blocking::spi::Transfer;
-use embedded_hal::digital::v2::OutputPin;
-use embedded_time::clock::Error;
+use core::fmt::{Debug, Formatter};
+use embedded_hal::spi::{Error, ErrorType, Operation};
+use embedded_hal::spi::{ErrorKind, SpiDevice};
+use embedded_time::clock::Error as ClockError;
 use embedded_time::duration::Duration;
 use embedded_time::fixed_point::FixedPoint;
 use embedded_time::fraction::Fraction;
@@ -27,9 +28,9 @@ impl Clock for TestClock {
     type T = u64;
     const SCALING_FACTOR: Fraction = Fraction::new(1, 1_000_000);
 
-    fn try_now(&self) -> Result<Instant<Self>, Error> {
+    fn try_now(&self) -> Result<Instant<Self>, ClockError> {
         if self.next_instants.borrow().len() == 0 {
-            return Err(Error::Unspecified);
+            return Err(ClockError::Unspecified);
         }
 
         Ok(Instant::new(self.next_instants.borrow_mut().remove(0)))
@@ -43,23 +44,43 @@ impl Clock for TestClock {
     }
 }
 
-mock! {
-    pub SPIBus {}
+pub struct MockDeviceBuilder {
+    device: MockSPIDevice,
+}
 
-    impl Transfer<u8> for SPIBus{
-        type Error = u32;
+#[derive(Debug, Clone)]
+pub enum SPIError {
+    Error1,
+}
 
-        fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'static [u8], u32>;
+impl Error for SPIError {
+    fn kind(&self) -> ErrorKind {
+        ErrorKind::Other
     }
 }
 
 mock! {
-    pub Pin {}
+    pub SPIDevice {}
 
-    impl OutputPin for Pin {
-        type Error = u32;
+    impl ErrorType for SPIDevice {
+        type Error = SPIError;
+    }
+    impl SpiDevice<u8> for SPIDevice {
 
-        fn set_low(&mut self) -> Result<(), u32>;
-        fn set_high(&mut self) -> Result<(), u32>;
+        fn transaction<'a>(
+        &mut self,
+        operations: &mut [Operation<'a, u8>]
+        ) -> Result<(), SPIError>;
+    }
+
+    impl PartialEq for SPIDevice {
+        fn eq(&self, _other: &Self) -> bool {
+            true
+        }
+    }
+    impl Debug for SPIDevice {
+    fn fmt<'a>(&self, f: &mut Formatter<'a>) -> core::fmt::Result {
+            f.debug_struct("MockSpiDevice").finish()
+        }
     }
 }

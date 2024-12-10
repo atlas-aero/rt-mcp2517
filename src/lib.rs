@@ -16,7 +16,7 @@
 //!## CAN TX/RX example
 //!
 //!```
-//!use mcp2517::example::{ExampleClock,ExampleCSPin,ExampleSPIBus};
+//!use mcp2517::example::{ExampleClock,ExampleSPIDevice};
 //!use mcp2517::can::{MCP2517,CanController};
 //!use mcp2517::message::{Can20,TxMessage};
 //!use mcp2517::filter::Filter;
@@ -24,11 +24,10 @@
 //!use bytes::Bytes;
 //!use embedded_can::{Id,StandardId};
 //!
-//!let cs_pin = ExampleCSPin{};
-//!let spi_bus = ExampleSPIBus::default();
+//!let spi_dev = ExampleSPIDevice::default();
 //!let clock = ExampleClock::default();
 //!
-//!let mut controller = MCP2517::new(spi_bus, cs_pin);
+//!let mut controller = MCP2517::new(spi_dev);
 //!
 //!// configure CAN controller
 //!controller
