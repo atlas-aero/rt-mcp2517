@@ -116,15 +116,15 @@ pub struct FifoStatusReg0 {
 pub struct FilterMaskReg {
     #[skip]
     __: B1,
-    /// Identifier Receive mode bit,
+    // Identifier Receive mode bit
     /// if 1, match either standard or extended (corresponding to EXIDE bit in filter),
     /// if 0 match either
     pub mide: bool,
-    /// Standard ID Mask bit
+    // Standard ID Mask bi
     pub msid11: bool,
-    /// Extended ID Mask bits
+    // Extended ID Mask bit
     pub meid: B18,
-    /// Standard ID Mask bits
+    // Standard ID Mask bit
     pub msid: B11,
 }
 
@@ -135,15 +135,15 @@ pub struct FilterMaskReg {
 pub struct FilterObjectReg {
     #[skip]
     __: B1,
-    /// Extended ID enable bit
+    // Extended ID enable bi
     /// If MIDE 1, setting this bit matches Extended ID only
     /// If MIDE 0, clearing this bit matches Standard ID only
     pub exide: bool,
-    /// Standard ID filter bit
+    // Standard ID filter bi
     pub sid11: bool,
-    /// Extended ID filter bits
+    // Extended ID filter bit
     pub eid: B18,
-    /// Standard ID filter rbits
+    // Standard ID filter rbit
     pub sid: B11,
 }
 
@@ -152,16 +152,16 @@ pub struct FilterObjectReg {
 #[derive(Default, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub struct C1NBTCFG {
-    /// Baud rate prescalar bits
+    // Baud rate prescalar bit
     pub brp: B8,
-    /// Time Segment 1 bits (Propagation Segment + Phase Segment 1)
+    // Time Segment 1 bits (Propagation Segment + Phase Segment 1
     pub tseg1: B8,
     #[skip]
     __: B1,
-    /// Time Segment 2 bits (Phase Segment 2)
+    // Time Segment 2 bits (Phase Segment 2
     pub tseg2: B7,
     #[skip]
     __: B1,
-    /// Synchronization Jump Width bits
+    // Synchronization Jump Width bit
     pub sjw: B7,
 }

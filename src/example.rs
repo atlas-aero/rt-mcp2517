@@ -122,7 +122,7 @@ impl Clock for ExampleClock {
         Ok(Instant::new(self.next_instants.borrow_mut().remove(0)))
     }
 
-    fn new_timer<Dur: Duration + FixedPoint>(&self, duration: Dur) -> Timer<OneShot, Armed, Self, Dur> {
+    fn new_timer<Dur: Duration + FixedPoint>(&self, duration: Dur) -> Timer<'_, OneShot, Armed, Self, Dur> {
         Timer::new(self, duration)
     }
 }
