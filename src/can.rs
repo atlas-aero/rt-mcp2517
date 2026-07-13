@@ -35,6 +35,10 @@ const REGISTER_C1CON: u16 = 0x000;
 
 const REGISTER_OSC: u16 = 0xE00;
 
+const REGISTER_IOCON: u16 = 0xE04;
+
+const IOCON_XSTBYEN: u8 = 1 << 6;
+
 const REGISTER_C1NBTCFG: u16 = 0x004;
 
 /// FIFO index for receiving CAN messages
@@ -224,6 +228,14 @@ where
         self.enable_mode(OperationMode::Configuration, clock, CanError::ConfigurationModeTimeout)?;
 
         self.write_register(REGISTER_OSC, config.clock.as_register())?;
+
+        let iocon = self.read_register(REGISTER_IOCON)?;
+        let iocon = if config.xstby_enable {
+            iocon | IOCON_XSTBYEN
+        } else {
+            iocon & !IOCON_XSTBYEN
+        };
+        self.write_register(REGISTER_IOCON, iocon)?;
 
         let nbr_values = config.bit_rate.calculate_values();
         let nbr_reg = C1NBTCFG::from_bytes(nbr_values).into();

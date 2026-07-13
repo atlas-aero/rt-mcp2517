@@ -116,6 +116,7 @@ fn main() -> ! {
     // Setup CAN Controller config
     let config = Configuration {
         clock: clk_config,
+        xstby_enable: false,
         fifo: fifo_config,
         mode: RequestMode::InternalLoopback,
         bit_rate: BitRateConfig::default(),

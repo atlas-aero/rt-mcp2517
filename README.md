@@ -12,6 +12,7 @@ Crate currently offers the following features:
 
 * CAN2.0 and CAN FD format support
 * Standard and extended ID formats for CAN frames
+* MCP2518FD XSTBY transceiver standby pin control
 * `no_std` support
 
 ## Example
@@ -41,6 +42,7 @@ controller
                 disable_clock: false,
                 pll: PLLSetting::TenTimesPLL,
                  },
+            xstby_enable: false,
             fifo: FifoConfiguration {
                 rx_size: 16,
                 tx_attempts: RetransmissionAttempts::Three,

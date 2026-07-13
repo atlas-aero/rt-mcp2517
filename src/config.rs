@@ -56,6 +56,12 @@ pub struct Configuration {
     /// Oscillator/Clock configuration
     pub clock: ClockConfiguration,
 
+    /// Enable the MCP2518FD XSTBY transceiver standby pin control.
+    ///
+    /// When enabled, the controller drives XSTBY low while active and high
+    /// while in Sleep mode. This has no effect on the MCP2517FD.
+    pub xstby_enable: bool,
+
     /// TX/RX FIFO configuration
     pub fifo: FifoConfiguration,
 
