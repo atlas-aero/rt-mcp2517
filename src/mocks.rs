@@ -29,7 +29,7 @@ impl Clock for TestClock {
     const SCALING_FACTOR: Fraction = Fraction::new(1, 1_000_000);
 
     fn try_now(&self) -> Result<Instant<Self>, ClockError> {
-        if self.next_instants.borrow().len() == 0 {
+        if self.next_instants.borrow().is_empty() {
             return Err(ClockError::Unspecified);
         }
 
