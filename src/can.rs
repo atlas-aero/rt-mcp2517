@@ -398,7 +398,7 @@ where
 
     /// Read message from RX FIFO
     pub(crate) fn read_fifo<const L: usize>(&mut self, register: u16, data: &mut [u8; L]) -> Result<(), CanError<D>> {
-        if L % 4 != 0 {
+        if !L.is_multiple_of(4) {
             return Err(CanError::InvalidBufferSize(L));
         }
 

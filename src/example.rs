@@ -115,7 +115,7 @@ impl Clock for ExampleClock {
     const SCALING_FACTOR: Fraction = Fraction::new(1, 1_000_000);
 
     fn try_now(&self) -> Result<Instant<Self>, Error> {
-        if self.next_instants.borrow().len() == 0 {
+        if self.next_instants.borrow().is_empty() {
             return Err(Error::Unspecified);
         }
 

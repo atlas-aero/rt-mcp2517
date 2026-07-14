@@ -163,7 +163,7 @@ impl<const L: usize> MessageType<L> for Can20<L> {
             return Err(MessageError::InvalidLength(payload_length));
         }
 
-        if L % 4 != 0 {
+        if !L.is_multiple_of(4) {
             debug!("CAN2.0 generic argument must be 4 or 8");
             return Err(MessageError::InvalidTypeSize(L));
         }
@@ -191,7 +191,7 @@ impl<const L: usize> MessageType<L> for CanFd<L> {
             return Err(MessageError::InvalidLength(payload_length));
         }
 
-        if L % 4 != 0 {
+        if !L.is_multiple_of(4) {
             debug!("CANFD generic argument must be a multiple of 4");
             return Err(MessageError::InvalidTypeSize(L));
         }
