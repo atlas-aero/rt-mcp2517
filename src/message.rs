@@ -37,6 +37,7 @@
 //! // Create message object
 //! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
 //! ```
+#![allow(unused_parens)]
 
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
