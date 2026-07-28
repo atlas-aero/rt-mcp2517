@@ -37,6 +37,7 @@
 //! // Create message object
 //! let tx_message = TxMessage::new(message_type,bytes,message_id).unwrap();
 //! ```
+#![allow(unused_parens)]
 
 use bytes::Bytes;
 use embedded_can::{ExtendedId, Id, StandardId};
@@ -114,28 +115,28 @@ pub struct TxHeader {
     // T0
     #[skip]
     __: B2,
-    /// standard ID in FD mode can be extended to 12 bits if sid11 is set
+    // standard ID in FD mode can be extended to 12 bits if sid11 is se
     pub sid11: bool,
-    /// 18 lsb of extended ID
+    // 18 lsb of extended I
     pub extended_identifier: B18,
-    /// standard ID bits or msb 11 bits of extended ID
+    // standard ID bits or msb 11 bits of extended I
     pub standard_identifier: B11,
     // T1
     #[skip]
     __: B16,
-    /// Sequence keeping track of transmitted messages in Transmit Event FIFO
+    // Sequence keeping track of transmitted messages in Transmit Event FIF
     pub sequence: B7,
-    /// In normal ESI mode, set if node is error passive, cleared if node is error active
+    // In normal ESI mode, set if node is error passive, cleared if node is error activ
     pub error_status_indicator: bool,
-    /// Bit distinguishing between CAN and CAN FD formats
+    // Bit distinguishing between CAN and CAN FD format
     pub fd_frame: bool,
-    /// Enables bit rate switching in CAN FD frames
+    // Enables bit rate switching in CAN FD frame
     pub bit_rate_switch: bool,
-    /// Set if the frame is a RTR frame
+    // Set if the frame is a RTR fram
     pub remote_transmission_request: bool,
-    /// Set if extended ID is used
+    // Set if extended ID is use
     pub identifier_extension_flag: bool,
-    /// 4 bits identifying the payload length
+    // 4 bits identifying the payload lengt
     pub data_length_code: DLC,
 }
 
@@ -162,7 +163,7 @@ impl<const L: usize> MessageType<L> for Can20<L> {
             return Err(MessageError::InvalidLength(payload_length));
         }
 
-        if L % 4 != 0 {
+        if !L.is_multiple_of(4) {
             debug!("CAN2.0 generic argument must be 4 or 8");
             return Err(MessageError::InvalidTypeSize(L));
         }
@@ -190,7 +191,7 @@ impl<const L: usize> MessageType<L> for CanFd<L> {
             return Err(MessageError::InvalidLength(payload_length));
         }
 
-        if L % 4 != 0 {
+        if !L.is_multiple_of(4) {
             debug!("CANFD generic argument must be a multiple of 4");
             return Err(MessageError::InvalidTypeSize(L));
         }
@@ -263,29 +264,29 @@ pub struct RxHeader {
     // R0
     #[skip]
     __: B2,
-    /// In FD mode the standard ID can be extended to 12 bit using r1
+    // In FD mode the standard ID can be extended to 12 bit using r
     sid11: bool,
-    /// Extended Identifier
+    // Extended Identifie
     extended_identifier: B18,
-    /// Standard Identifier
+    // Standard Identifie
     standard_identifier: B11,
     #[skip]
     __: B16,
-    /// Filter Hit, number of filter that matched
+    // Filter Hit, number of filter that matche
     filter_hit: B5,
     #[skip]
     __: B2,
-    /// Error Status Indicator
+    // Error Status Indicato
     error_status_indicator: bool,
-    /// FD Frame; distinguishes between CAN and CAN FD formats
+    // FD Frame; distinguishes between CAN and CAN FD format
     fd_frame: bool,
-    /// Bit Rate Switch; indicates if data bit rate was switched
+    // Bit Rate Switch; indicates if data bit rate was switche
     bit_rate_switch: bool,
-    /// Remote Transmission Request; not used in CAN FD
+    // Remote Transmission Request; not used in CAN F
     remote_transmission_request: bool,
-    /// Identifier Extension Flag; distinguishes between base and extended format
+    // Identifier Extension Flag; distinguishes between base and extended forma
     identifier_extension_flag: bool,
-    /// Data Length Code
+    // Data Length Cod
     data_length_code: DLC,
 }
 

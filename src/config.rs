@@ -56,6 +56,12 @@ pub struct Configuration {
     /// Oscillator/Clock configuration
     pub clock: ClockConfiguration,
 
+    /// Enable the MCP2518FD XSTBY transceiver standby pin control.
+    ///
+    /// When enabled, the controller drives XSTBY low while active and high
+    /// while in Sleep mode. This has no effect on the MCP2517FD.
+    pub xstby_enable: bool,
+
     /// TX/RX FIFO configuration
     pub fifo: FifoConfiguration,
 
@@ -107,18 +113,13 @@ impl ClockConfiguration {
 }
 
 /// Divisor for clock output
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub enum ClockOutputDivisor {
     DivideBy10 = 0b11,
     DivideBy4 = 0b10,
     DivideBy2 = 0b01,
+    #[default]
     DivideBy1 = 0b00,
-}
-
-impl Default for ClockOutputDivisor {
-    fn default() -> Self {
-        Self::DivideBy1
-    }
 }
 
 impl ClockOutputDivisor {
@@ -134,16 +135,11 @@ impl ClockOutputDivisor {
 }
 
 /// Divisor for system clock
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub enum SystemClockDivisor {
     DivideBy2 = 0b1,
+    #[default]
     DivideBy1 = 0b0,
-}
-
-impl Default for SystemClockDivisor {
-    fn default() -> Self {
-        Self::DivideBy1
-    }
 }
 
 impl SystemClockDivisor {
@@ -158,18 +154,13 @@ impl SystemClockDivisor {
 }
 
 /// PLL configuration
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub enum PLLSetting {
     /// System clock from 10x PLL
     TenTimesPLL = 0b1,
+    #[default]
     /// System clock comes directly from XTAL oscillator
     DirectXTALOscillator = 0b0,
-}
-
-impl Default for PLLSetting {
-    fn default() -> Self {
-        Self::DirectXTALOscillator
-    }
 }
 
 impl PLLSetting {
@@ -267,22 +258,18 @@ impl FifoConfiguration {
 }
 
 /// Number of retransmission attempts
-#[derive(Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug)]
 pub enum RetransmissionAttempts {
     Disabled = 0b00,
     Three = 0b01,
+    #[default]
     Unlimited = 0b10,
 }
 
-impl Default for RetransmissionAttempts {
-    fn default() -> Self {
-        Self::Unlimited
-    }
-}
-
 /// Request mode. This is basically a subset of operation mode, filtered to request modes
-#[derive(Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug)]
 pub enum RequestMode {
+    #[default]
     /// Normal CAN FD mode, supports mixing of CAN FDC can classic CAN 2.0 frames
     NormalCANFD,
     /// Internal loop back mode
@@ -293,12 +280,6 @@ pub enum RequestMode {
     ListenOnly,
     /// CAN 2.0 mode, possible error frames on CAN FD frames
     NormalCAN2_0,
-}
-
-impl Default for RequestMode {
-    fn default() -> Self {
-        Self::NormalCANFD
-    }
 }
 
 impl RequestMode {

@@ -21,6 +21,10 @@ fn expect_config(spi_dev: &mut Mocks, seq: &mut Sequence) {
     // Writing clock configuration
     spi_dev.expect_register_write([0x2E, 0x0, 0b0110_0001], seq);
 
+    // Enable MCP2518FD XSTBY control while preserving IOCON GPIO directions
+    spi_dev.mock_register_read::<0b0000_0011>([0x3E, 0x04], seq);
+    spi_dev.expect_register_write([0x2E, 0x04, 0b0100_0011], seq);
+
     // Writing NBT configuration register
     spi_dev.mock_write32([0x20, 0x04, 1, 15, 62, 0], seq);
 
@@ -86,6 +90,7 @@ fn test_configure_correct() {
                     disable_clock: false,
                     pll: PLLSetting::TenTimesPLL,
                 },
+                xstby_enable: true,
                 fifo: FifoConfiguration {
                     rx_size: 16,
                     tx_attempts: RetransmissionAttempts::Three,
@@ -409,6 +414,7 @@ fn test_request_mode_timeout() {
                     disable_clock: false,
                     pll: PLLSetting::TenTimesPLL,
                 },
+                xstby_enable: true,
                 fifo: FifoConfiguration {
                     rx_size: 16,
                     tx_attempts: RetransmissionAttempts::Three,
@@ -737,6 +743,7 @@ fn test_lib() {
                     disable_clock: false,
                     pll: PLLSetting::TenTimesPLL,
                 },
+                xstby_enable: true,
                 fifo: FifoConfiguration {
                     rx_size: 16,
                     tx_attempts: RetransmissionAttempts::Three,
