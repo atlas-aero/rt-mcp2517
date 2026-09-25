@@ -166,7 +166,7 @@ fn test_transmit_can20() {
 
     cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
 
-    for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+    for chunk in cmd_and_header_buffer[2..].as_chunks_mut::<4>().0 {
         let num = BigEndian::read_u32(chunk);
         LittleEndian::write_u32(chunk, num);
     }
@@ -217,7 +217,7 @@ fn test_transmit_can20_3_bytes() {
 
     cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
 
-    for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+    for chunk in cmd_and_header_buffer[2..].as_chunks_mut::<4>().0 {
         let num = BigEndian::read_u32(chunk);
         LittleEndian::write_u32(chunk, num);
     }
@@ -269,7 +269,7 @@ fn test_transmit_can_fd() {
 
     cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
 
-    for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+    for chunk in cmd_and_header_buffer[2..].as_chunks_mut::<4>().0 {
         let num = BigEndian::read_u32(chunk);
         LittleEndian::write_u32(chunk, num);
     }

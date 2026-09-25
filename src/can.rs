@@ -444,7 +444,7 @@ where
         buffer[1] = (command & 0xFF) as u8;
         buffer[2..].copy_from_slice(&message.header.into_bytes());
 
-        for word in buffer[2..].chunks_exact_mut(4) {
+        for word in buffer[2..].as_chunks_mut::<4>().0 {
             let num = BigEndian::read_u32(word);
             LittleEndian::write_u32(word, num);
         }
@@ -533,10 +533,7 @@ where
         let txfifo_status_byte0 = self.read_register(fifo_reg_addr)?;
         let txfifo_status_reg0 = FifoStatusReg0::from(txfifo_status_byte0);
 
-        if txfifo_status_reg0.tfnrfnif() {
-            return Ok(true);
-        }
-        Ok(false)
+        Ok(txfifo_status_reg0.tfnrfnif())
     }
 
     /// Returns true if `TXREQ` bit of TX fifo is cleared i.e. all messages contained are transmitted
@@ -545,10 +542,7 @@ where
         let txfifo_control_byte1 = self.read_register(fifo_ctrl_reg)?;
         let txfifo_control_reg = FifoControlReg1::from(txfifo_control_byte1);
 
-        if txfifo_control_reg.txreq() {
-            return Ok(false);
-        }
-        Ok(true)
+        Ok(!txfifo_control_reg.txreq())
     }
 
     /// Returns the configuration register address for the given FIFO index
