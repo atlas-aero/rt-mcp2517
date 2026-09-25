@@ -39,6 +39,9 @@ const REGISTER_OSC: u16 = 0xE00;
 const REGISTER_IOCON: u16 = 0xE04;
 
 const IOCON_XSTBYEN: u8 = 1 << 6;
+const IOCON_TRIS0: u8 = 1 << 0;
+// LAT0 is bit 0 of IOCON byte 1 (bit 8 of the full register).
+const IOCON_LAT0: u8 = 1 << 0;
 
 const REGISTER_C1NBTCFG: u16 = 0x004;
 
@@ -289,7 +292,12 @@ where
 
         let iocon = self.read_register(REGISTER_IOCON)?;
         let iocon = if config.xstby_enable {
-            iocon | IOCON_XSTBYEN
+            // XSTBYEN alone leaves GPIO0 as an input after reset. Preload LOW
+            // before enabling the output, preserving GPIO1's latch and direction.
+            // MCP2518FD requires single-byte IOCON writes (DS80000789, SPI/GPIO).
+            let latch = self.read_register(REGISTER_IOCON + 1)?;
+            self.write_register(REGISTER_IOCON + 1, latch & !IOCON_LAT0)?;
+            (iocon | IOCON_XSTBYEN) & !IOCON_TRIS0
         } else {
             iocon & !IOCON_XSTBYEN
         };

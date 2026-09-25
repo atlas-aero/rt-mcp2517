@@ -17,13 +17,23 @@ use embedded_hal::spi::Operation;
 use mockall::Sequence;
 
 /// CAN configuration mock
-fn expect_config(spi_dev: &mut Mocks, seq: &mut Sequence) {
+fn expect_config(spi_dev: &mut Mocks, seq: &mut Sequence, xstby_enable: bool) {
     // Writing clock configuration
     spi_dev.expect_register_write([0x2E, 0x0, 0b0110_0001], seq);
 
-    // Enable MCP2518FD XSTBY control while preserving IOCON GPIO directions
-    spi_dev.mock_register_read::<0b0000_0011>([0x3E, 0x04], seq);
-    spi_dev.expect_register_write([0x2E, 0x04, 0b0100_0011], seq);
+    if xstby_enable {
+        // POR leaves both GPIOs as inputs. LAT0 is unspecified and may be high.
+        spi_dev.mock_register_read::<0b0000_0011>([0x3E, 0x04], seq);
+        spi_dev.mock_register_read::<0b0000_0011>([0x3E, 0x05], seq);
+        // Clear LAT0 before enabling the output; preserve LAT1 and TRIS1.
+        // Separate single-byte writes are required by the MCP2518FD errata.
+        spi_dev.expect_register_write([0x2E, 0x05, 0b0000_0010], seq);
+        spi_dev.expect_register_write([0x2E, 0x04, 0b0100_0010], seq);
+    } else {
+        // Disabling XSTBY must preserve GPIO directions and leave latches untouched.
+        spi_dev.mock_register_read::<0b0100_0011>([0x3E, 0x04], seq);
+        spi_dev.expect_register_write([0x2E, 0x04, 0b0000_0011], seq);
+    }
 
     // Writing NBT configuration register
     spi_dev.mock_write32([0x20, 0x04, 1, 15, 62, 0], seq);
@@ -52,7 +62,16 @@ fn expect_config(spi_dev: &mut Mocks, seq: &mut Sequence) {
 }
 
 #[test]
-fn test_configure_correct() {
+fn test_configure_xstby_drives_low_from_reset() {
+    configure_correct(true);
+}
+
+#[test]
+fn test_configure_without_xstby_preserves_gpio() {
+    configure_correct(false);
+}
+
+fn configure_correct(xstby_enable: bool) {
     let clock = TestClock::new(vec![
         100,    // Config mode: Timer start,
         200,    // Config mode: First expiration check
@@ -73,7 +92,7 @@ fn test_configure_correct() {
     // Configuration mode
     mock.mock_register_read::<0b1001_0100>([0x30, 0x2], &mut sequence);
 
-    expect_config(&mut mock, &mut sequence);
+    expect_config(&mut mock, &mut sequence, xstby_enable);
 
     // Request normal CAN 2.0B mode
     mock.expect_register_write([0x20, 0x3, 0b0000_1110], &mut sequence);
@@ -90,7 +109,7 @@ fn test_configure_correct() {
                     disable_clock: false,
                     pll: PLLSetting::TenTimesPLL,
                 },
-                xstby_enable: true,
+                xstby_enable,
                 fifo: FifoConfiguration {
                     rx_size: 16,
                     tx_attempts: RetransmissionAttempts::Three,
@@ -397,7 +416,7 @@ fn test_request_mode_timeout() {
     // Configuration mode
     mock.mock_register_read::<0b1001_0100>([0x30, 0x2], &mut seq);
 
-    expect_config(&mut mock, &mut seq);
+    expect_config(&mut mock, &mut seq, true);
 
     // Request normal CAN FD mode
     mock.expect_register_write([0x20, 0x3, 0b0000_1000], &mut seq);

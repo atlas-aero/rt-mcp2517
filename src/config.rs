@@ -58,8 +58,13 @@ pub struct Configuration {
 
     /// Enable the MCP2518FD XSTBY transceiver standby pin control.
     ///
-    /// When enabled, the controller drives XSTBY low while active and high
-    /// while in Sleep mode. This has no effect on the MCP2517FD.
+    /// Configures GPIO0 as an output with a low latch before enabling XSTBY.
+    /// The controller drives XSTBY low while active and high while in Sleep mode.
+    /// GPIO1 is preserved. Disabling this option leaves GPIO directions and
+    /// latches unchanged.
+    ///
+    /// Only enable on MCP2518FD hardware wired for transceiver standby control;
+    /// the MCP2517FD does not support XSTBY and would instead drive GPIO0 low.
     pub xstby_enable: bool,
 
     /// TX/RX FIFO configuration
