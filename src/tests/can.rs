@@ -6,7 +6,7 @@ use crate::config::{
 };
 use crate::example::{ExampleClock, ExampleSPIDevice};
 use crate::filter::Filter;
-use crate::message::{Can20, CanFd, TxMessage};
+use crate::message::{Can20, CanFd, FrameType, RxFrame, TxMessage};
 use crate::mocks::{MockSPIDevice, SPIError, TestClock};
 use crate::status::OperationMode;
 use alloc::vec;
@@ -166,7 +166,7 @@ fn test_transmit_can20() {
 
     cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
 
-    for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+    for chunk in cmd_and_header_buffer[2..].as_chunks_mut::<4>().0 {
         let num = BigEndian::read_u32(chunk);
         LittleEndian::write_u32(chunk, num);
     }
@@ -217,7 +217,7 @@ fn test_transmit_can20_3_bytes() {
 
     cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
 
-    for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+    for chunk in cmd_and_header_buffer[2..].as_chunks_mut::<4>().0 {
         let num = BigEndian::read_u32(chunk);
         LittleEndian::write_u32(chunk, num);
     }
@@ -269,7 +269,7 @@ fn test_transmit_can_fd() {
 
     cmd_and_header_buffer[2..].copy_from_slice(&tx_message.header.into_bytes());
 
-    for chunk in cmd_and_header_buffer[2..].chunks_exact_mut(4) {
+    for chunk in cmd_and_header_buffer[2..].as_chunks_mut::<4>().0 {
         let num = BigEndian::read_u32(chunk);
         LittleEndian::write_u32(chunk, num);
     }
@@ -288,12 +288,12 @@ fn test_transmit_can_fd() {
 }
 
 #[test]
-fn test_read_fifo_invalid_payload_buffer_size() {
+fn test_read_fifo_rejects_address_outside_ram() {
     let mocks = Mocks::default();
     let mut buff = [0u8; 3];
 
     let result = mocks.into_controller().read_fifo(0x123, &mut buff);
-    assert_eq!(result.unwrap_err(), CanError::InvalidBufferSize(3));
+    assert_eq!(result.unwrap_err(), CanError::InvalidRamAddress(0x123));
 }
 
 #[test]
@@ -312,6 +312,9 @@ fn test_receive() {
 
     // user address register read
     mocks.mock_read32::<0x00_00_04_7C>([0x30, 0x64], &mut seq);
+
+    mocks.mock_read32::<0x55>([0x38, 0x7c], &mut seq);
+    mocks.mock_read32::<8>([0x38, 0x80], &mut seq);
 
     // Message read from RAM address (0x47C+8) to start reading received message object payload
     // transfer cmd+address
@@ -786,4 +789,144 @@ fn test_lib() {
     let result = controller.receive(&mut buff, true);
     assert!(result.is_ok());
     assert_eq!(buff, [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
+}
+
+#[test]
+fn receive_rejects_all_ones_fifo_pointer_before_reading_ram() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    mocks.mock_register_read::<0xff>([0x30, 0x60], &mut seq);
+    mocks.mock_read32::<0xffff_ffff>([0x30, 0x64], &mut seq);
+    assert_eq!(
+        mocks.into_controller().receive(&mut [0; 8], false),
+        Err(CanError::InvalidRamAddress(0xffff))
+    );
+}
+
+fn receive_frame<const WORD0: u32, const WORD1: u32, const N: usize>(
+    payload: [u8; N],
+    data: &mut [u8],
+) -> Result<RxFrame, CanError<MockSPIDevice>> {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    mocks.mock_register_read::<1>([0x30, 0x60], &mut seq);
+    mocks.mock_read32::<0>([0x30, 0x64], &mut seq);
+    mocks.mock_read32::<WORD0>([0x34, 0], &mut seq);
+    mocks.mock_read32::<WORD1>([0x34, 4], &mut seq);
+    if N != 0 && N <= data.len() {
+        mocks.expect_fifo_read_transaction([0x34, 8], payload, &mut seq);
+    }
+    mocks.expect_register_write([0x20, 0x5d, 1], &mut seq);
+    mocks.into_controller().receive(data, false)
+}
+
+#[test]
+fn receive_returns_extended_id_and_actual_length() {
+    const ID: u32 = 0x18ff50e5;
+    const HEADER: u32 = (ID >> 18) | ((ID & 0x3ffff) << 11);
+    let mut data = [0; 8];
+    let frame = receive_frame::<HEADER, 0x18, 8>([1, 2, 3, 4, 5, 6, 7, 8], &mut data).unwrap();
+    assert_eq!(
+        frame,
+        RxFrame {
+            id: Id::Extended(ExtendedId::new(ID).unwrap()),
+            frame_type: FrameType::Data,
+            dlc: 8,
+            data_length: 8
+        }
+    );
+    assert_eq!(data, [1, 2, 3, 4, 5, 6, 7, 8]);
+}
+
+#[test]
+fn receive_short_classic_frame_leaves_buffer_tail_untouched() {
+    let mut data = [0xaa; 8];
+    let frame = receive_frame::<0x321, 3, 3>([1, 2, 3], &mut data).unwrap();
+    assert_eq!(frame.id, Id::Standard(StandardId::new(0x321).unwrap()));
+    assert_eq!(frame.data_length, 3);
+    assert_eq!(frame.dlc, 3);
+    assert_eq!(frame.frame_type, FrameType::Data);
+    assert_eq!(data, [1, 2, 3, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa]);
+}
+
+#[test]
+fn receive_remote_frame_has_no_payload() {
+    let frame = receive_frame::<0x321, 0x28, 0>([], &mut []).unwrap();
+    assert_eq!(frame.frame_type, FrameType::Remote);
+    assert_eq!(frame.dlc, 8);
+    assert_eq!(frame.data_length, 0);
+}
+
+#[test]
+fn receive_zero_length_data_frame() {
+    let frame = receive_frame::<0x321, 0, 0>([], &mut []).unwrap();
+    assert_eq!(frame.frame_type, FrameType::Data);
+    assert_eq!(frame.data_length, 0);
+}
+
+#[test]
+fn receive_fd_decodes_dlc_instead_of_using_buffer_size() {
+    let mut data = [0xaa; 64];
+    let frame = receive_frame::<0x321, 0xc9, 12>([42; 12], &mut data).unwrap();
+    assert_eq!(frame.frame_type, FrameType::Fd);
+    assert_eq!(frame.dlc, 9);
+    assert_eq!(frame.data_length, 12);
+    assert_eq!(&data[..12], &[42; 12]);
+    assert_eq!(&data[12..], &[0xaa; 52]);
+    assert_eq!(
+        receive_frame::<0x321, 0xcf, 64>([42; 64], &mut data).unwrap().data_length,
+        64
+    );
+}
+
+#[test]
+fn receive_rejects_invalid_headers_and_consumes_them() {
+    assert_eq!(
+        receive_frame::<0, 0xb8, 0>([], &mut [0; 8]),
+        Err(CanError::InvalidFrameHeader)
+    );
+    assert_eq!(
+        receive_frame::<0, 0x48, 0>([], &mut [0; 8]),
+        Err(CanError::InvalidFrameHeader)
+    );
+    assert_eq!(
+        receive_frame::<0xffff_ffff, 0xffff_ffff, 0>([], &mut [0; 8]),
+        Err(CanError::InvalidFrameHeader)
+    );
+}
+
+#[test]
+fn receive_consumes_frame_that_exceeds_buffer_without_copying() {
+    let mut data = [0xaa; 3];
+    assert_eq!(
+        receive_frame::<0, 8, 8>([42; 8], &mut data),
+        Err(CanError::InvalidBufferSize(3))
+    );
+    assert_eq!(data, [0xaa; 3]);
+}
+
+#[test]
+fn receive_rejects_header_crossing_ram_end() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    mocks.mock_register_read::<1>([0x30, 0x60], &mut seq);
+    mocks.mock_read32::<0x7fc>([0x30, 0x64], &mut seq);
+    assert_eq!(
+        mocks.into_controller().receive(&mut [0; 8], false),
+        Err(CanError::InvalidRamAddress(0xbfc))
+    );
+}
+
+#[test]
+fn receive_rejects_payload_crossing_ram_end() {
+    let mut mocks = Mocks::default();
+    let mut seq = Sequence::new();
+    mocks.mock_register_read::<1>([0x30, 0x60], &mut seq);
+    mocks.mock_read32::<0x7f8>([0x30, 0x64], &mut seq);
+    mocks.mock_read32::<0>([0x3b, 0xf8], &mut seq);
+    mocks.mock_read32::<8>([0x3b, 0xfc], &mut seq);
+    assert_eq!(
+        mocks.into_controller().receive(&mut [0; 8], false),
+        Err(CanError::InvalidRamAddress(0xbf8))
+    );
 }

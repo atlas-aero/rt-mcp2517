@@ -148,10 +148,10 @@ fn main() -> ! {
         timer.delay_ms(500);
 
         match can_controller.receive(&mut receive_buffer, true) {
-            Ok(_) => {
-                uart.write_fmt(format_args!("can message received\n\r")).unwrap();
+            Ok(frame) => {
+                uart.write_fmt(format_args!("can message received: {:?}\n\r", frame)).unwrap();
 
-                for val in receive_buffer {
+                for val in &receive_buffer[..frame.data_length] {
                     uart.write_fmt(format_args!("{val}\n\r")).unwrap();
                 }
             }
