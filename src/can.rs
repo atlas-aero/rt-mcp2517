@@ -20,12 +20,13 @@
 
 use crate::config::{ClockConfiguration, Configuration};
 use crate::filter::Filter;
-use crate::message::{MessageType, TxMessage};
+use crate::message::{FrameType, MessageType, RxFrame, TxMessage};
 use crate::registers::{FifoControlReg1, FifoStatusReg0, C1NBTCFG};
 use crate::status::{OperationMode, OperationStatus, OscillatorStatus};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use core::fmt::Debug;
 use core::marker::PhantomData;
+use embedded_can::{ExtendedId, Id, StandardId};
 use embedded_hal::spi::{Operation as SpiOperation, SpiDevice};
 use embedded_time::duration::Milliseconds;
 use embedded_time::Clock;
@@ -74,6 +75,8 @@ pub enum CanError<D: SpiDevice<u8>> {
     InvalidRamAddress(u16),
     /// Payload buffer length not a multiple of 4 bytes
     InvalidBufferSize(usize),
+    /// Invalid or unsupported receive header
+    InvalidFrameHeader,
     /// RX fifo empty error
     RxFifoEmptyErr,
     /// TX fifo buffer full error
@@ -107,9 +110,14 @@ pub trait CanController {
         blocking: bool,
     ) -> Result<(), Self::Error>;
 
-    /// Receive CAN message
-    /// * `blocking`: if true, function blocks until RX fifo contains at least one message
-    fn receive<const L: usize>(&mut self, data: &mut [u8; L], blocking: bool) -> Result<(), Self::Error>;
+    /// Receive a frame and return its ID, wire format, DLC and actual payload length.
+    /// Only the received payload bytes are written; the buffer tail is unchanged.
+    /// RX timestamps must be disabled (the default configuration).
+    ///
+    /// With `blocking = false`, an empty FIFO returns an error immediately. Invalid
+    /// headers and frames too large for the buffer are consumed and return an error.
+    fn receive(&mut self, data: &mut [u8], blocking: bool) -> Result<RxFrame, Self::Error>;
+
     /// Set corresponding filter and mask registers
     fn set_filter_object(&mut self, filter: Filter) -> Result<(), Self::Error>;
 }
@@ -147,6 +155,9 @@ where
 
         // calculate address of next Message Object according to
         // Equation 4-1 in MCP251XXFD Family Reference Manual
+        if user_address > 0x7ff {
+            return Err(CanError::InvalidRamAddress(user_address as u16));
+        }
         let address = user_address + 0x400;
 
         // get address of TX FIFO control register byte 1
@@ -166,27 +177,74 @@ where
         Ok(())
     }
 
-    fn receive<const L: usize>(&mut self, data: &mut [u8; L], blocking: bool) -> Result<(), Self::Error> {
-        let fifo_status_reg = Self::fifo_status_register(FIFO_RX_INDEX);
-
-        // Make sure RX fifo is not empty
-        while !self.fifo_tfnrfnif(fifo_status_reg)? {
+    fn receive(&mut self, data: &mut [u8], blocking: bool) -> Result<RxFrame, Self::Error> {
+        while !self.fifo_tfnrfnif(Self::fifo_status_register(FIFO_RX_INDEX))? {
             if !blocking {
                 return Err(CanError::RxFifoEmptyErr);
             }
         }
 
-        let user_address = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
+        let offset = self.read32(Self::fifo_user_address_register(FIFO_RX_INDEX))?;
+        // Check before arithmetic/casting so all-ones SPI reads cannot wrap into RAM.
+        if offset > 0x7ff || offset % 4 != 0 {
+            return Err(CanError::InvalidRamAddress(offset as u16));
+        }
 
-        let address = 0x400 + user_address;
+        let address = 0x400 + offset as u16;
+        self.verify_ram_address(address, 8)?;
+        let word0 = self.read32(address)?;
+        let word1 = self.read32(address + 4)?;
+        let fd = word1 & 0x80 != 0;
+        let remote = word1 & 0x20 != 0;
+        let brs = word1 & 0x40 != 0;
 
-        // read message object
-        self.read_fifo(address as u16, data)?;
+        // Ignore unimplemented bits (undefined on read). SID11 cannot be represented
+        // by embedded_can::Id; RTR is invalid for FD and BRS is invalid for classic CAN.
+        if word0 & (1 << 29) != 0 || (fd && remote) || (!fd && brs) {
+            self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
+            return Err(CanError::InvalidFrameHeader);
+        }
 
-        // set UINC bit for incrementing the FIFO head by a single message
+        let dlc = (word1 & 0xf) as u8;
+        let frame_type = if fd {
+            FrameType::Fd
+        } else if remote {
+            FrameType::Remote
+        } else {
+            FrameType::Data
+        };
+        let data_length = if remote {
+            0
+        } else if fd {
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64][dlc as usize]
+        } else {
+            usize::from(dlc.min(8))
+        };
+
+        self.verify_ram_address(address, 8 + data_length)?;
+        if data_length > data.len() {
+            self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
+            return Err(CanError::InvalidBufferSize(data.len()));
+        }
+
+        let sid = (word0 & 0x7ff) as u16;
+        let id = if word1 & 0x10 != 0 {
+            Id::Extended(ExtendedId::new(((sid as u32) << 18) | ((word0 >> 11) & 0x3ffff)).unwrap())
+        } else {
+            Id::Standard(StandardId::new(sid).unwrap())
+        };
+
+        if data_length != 0 {
+            self.read_fifo(address, &mut data[..data_length])?;
+        }
         self.write_register(Self::fifo_control_register(FIFO_RX_INDEX) + 1, 1)?;
 
-        Ok(())
+        Ok(RxFrame {
+            id,
+            frame_type,
+            dlc,
+            data_length,
+        })
     }
 
     /// Set corresponding filter and mask registers
@@ -397,12 +455,10 @@ where
     }
 
     /// Read message from RX FIFO
-    pub(crate) fn read_fifo<const L: usize>(&mut self, register: u16, data: &mut [u8; L]) -> Result<(), CanError<D>> {
-        if !L.is_multiple_of(4) {
-            return Err(CanError::InvalidBufferSize(L));
-        }
+    pub(crate) fn read_fifo(&mut self, register: u16, data: &mut [u8]) -> Result<(), CanError<D>> {
+        self.verify_ram_address(register, 8 + data.len())?;
 
-        // Skip Transmit message object header
+        // Skip receive message object header
         let payload_address = register + 8;
         let mut buffer = [0u8; 2];
 
@@ -440,7 +496,7 @@ where
 
     /// Verify address within RAM bounds
     fn verify_ram_address(&self, addr: u16, data_length: usize) -> Result<(), CanError<D>> {
-        if addr < 0x400 || (addr + (data_length as u16)) > 0xBFF {
+        if addr < 0x400 || addr as usize + data_length > 0xC00 {
             return Err(CanError::InvalidRamAddress(addr));
         }
 

@@ -52,6 +52,32 @@ pub const MAX_PAYLOAD_CAN_2_0: usize = 8;
 
 pub const MAX_PAYLOAD_CAN_FD: usize = 64;
 
+/// Wire format of a received CAN frame.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum FrameType {
+    /// Classical CAN data frame carrying up to eight payload bytes.
+    Data,
+    /// Classical CAN remote request carrying no payload; its DLC specifies the requested length.
+    Remote,
+    /// CAN FD data frame carrying up to 64 payload bytes.
+    Fd,
+}
+
+/// Metadata for the payload copied into the caller's receive buffer.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct RxFrame {
+    /// Standard 11-bit or extended 29-bit identifier from the received frame header.
+    pub id: Id,
+    /// Received frame's wire format, distinguishing classical data, remote requests and CAN FD.
+    pub frame_type: FrameType,
+    /// Raw four-bit data length code from the header, not necessarily a byte count.
+    /// CAN FD codes above eight encode larger payloads; remote frames encode the requested length.
+    pub dlc: u8,
+    /// Decoded number of payload bytes written to the receive buffer, zero for remote frames.
+    /// Bytes beyond this length in the caller's buffer remain unchanged.
+    pub data_length: usize,
+}
+
 /// Data length code
 #[derive(BitfieldSpecifier, Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
 #[allow(clippy::upper_case_acronyms)]

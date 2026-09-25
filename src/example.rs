@@ -39,6 +39,15 @@ impl SpiDevice<u8> for ExampleSPIDevice {
             }
         }
 
+        for (command, value) in [([0x38, 0x7c], 0x55u32), ([0x38, 0x80], 8u32)] {
+            if operations[0] == Operation::Write(&command) {
+                if let Operation::Read(read) = &mut operations[1] {
+                    read.copy_from_slice(&value.to_le_bytes());
+                    return Ok(());
+                }
+            }
+        }
+
         // Read RX fifo (payload received)
         if operations[0] != Operation::Write(&[0x38, 0x84]) {
             return Ok(());

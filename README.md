@@ -81,7 +81,7 @@ controller.transmit( & can_message).unwrap();
 
 // Receive CAN message
 let mut buff = [0u8; 8];
-let result = controller.receive( & mut buff);
+let result = controller.receive(&mut buff, true);
 assert!(result.is_ok());
 assert_eq!(buff, [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
 ````
@@ -99,3 +99,23 @@ Licensed under either of
 at your option.
 
 Each contributor agrees that his/her contribution covers both licenses.
+
+## Receiving frames
+
+`CanController::receive(&mut buffer, blocking)` is the single receive API. It
+returns `RxFrame` metadata: `id`, `frame_type` (`Data`, `Remote` or `Fd`), raw `dlc`,
+and `data_length`. Only the actual payload bytes are copied; the buffer tail stays
+unchanged. Remote frames carry no payload; their DLC describes the requested length.
+CAN FD DLC values are decoded to lengths up to 64 bytes. Short payloads do not
+require a buffer length divisible by four.
+
+The driver checks FIFO offsets before address arithmetic, RAM bounds for both
+header and payload, and frame structure. Invalid headers and frames that exceed
+the caller's buffer are consumed and return an error. An empty FIFO returns
+`CanError::RxFifoEmptyErr` unless blocking reception was requested. RX timestamps
+must remain disabled (the default configuration).
+
+Applications must check the returned ID, frame type and payload length for their
+protocol and validate the payload before granting a safety-related permission.
+This API replaces both the former payload-only receive API and the separate
+validated reception API; implementers must supply metadata without a default fallback.
